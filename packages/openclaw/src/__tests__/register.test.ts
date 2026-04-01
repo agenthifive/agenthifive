@@ -58,12 +58,13 @@ describe("register (plugin integration)", () => {
 
     plugin.register(mockApi);
 
-    // Verify 5 tools registered
-    assert.equal(registeredTools.length, 5);
+    // Verify 6 tools registered
+    assert.equal(registeredTools.length, 6);
 
     const toolNames = registeredTools.map((t) => t.name);
     assert.ok(toolNames.includes("vault_execute"));
     assert.ok(toolNames.includes("request_permission"));
+    assert.ok(toolNames.includes("request_capability"));
     assert.ok(toolNames.includes("vault_await_approval"));
     assert.ok(toolNames.includes("vault_connections_list"));
     assert.ok(toolNames.includes("vault_connection_revoke"));
