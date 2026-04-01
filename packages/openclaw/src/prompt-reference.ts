@@ -173,7 +173,8 @@ const SECTION_TOOLS = `## Available Tools
 
 | Tool | Purpose |
 |------|---------|
-| \`request_permission\` | Request access to a service (workspace owner approves in dashboard) |
+| \`request_capability\` | Request access to a new service you don't have yet (workspace owner approves in dashboard) |
+| \`request_permission\` | Submit a step-up approval request for a sensitive action on an existing connection |
 | \`vault_execute\` | Make an API call through the vault proxy — vault injects credentials, enforces policies, logs audit |
 | \`vault_download\` | Download a file through the vault and save to disk — returns local file path. Use for binary downloads (Drive files, attachments, images) |
 | \`vault_connections_list\` | List active connections (service name, label, status) |
@@ -182,11 +183,11 @@ const SECTION_TOOLS = `## Available Tools
 
 const SECTION_PERMISSION_FLOW = `## How It Works
 
-1. **Request access:** Call \`request_permission\` with:
+1. **Request access to a new service:** Call \`request_capability\` with:
    - \`actionTemplateId\`: the capability ID (see table below)
    - \`reason\`: why you need it (e.g., "User asked me to send a Telegram message")
-2. **Tell the user** you've requested access and they need to approve it in the AgentHiFive dashboard
-3. **After approval, make API calls:** Call \`vault_execute\` with:
+2. **Tell the user** you've submitted the request and they need to go to the AgentHiFive dashboard to approve it and connect the service
+3. **After the service is connected, make API calls:** Call \`vault_execute\` with:
    - \`service\`: the service name (e.g., \`"telegram"\`, \`"anthropic-messages"\`, \`"gmail"\`)
    - \`method\`: HTTP method (GET, POST, PUT, DELETE, PATCH)
    - \`url\`: the provider API URL (see API Reference below)
@@ -252,8 +253,8 @@ const SECTION_SERVICE_DISCOVERY = `## When the User Asks About a Service
 **If the service is in the Action Template IDs table above (even if you have no active connection for it):**
 
 1. Tell the user you don't have access to it yet, but you can send a request to the vault to set it up
-2. If the user agrees, call \`request_permission\` with the matching \`actionTemplateId\` and a reason
-3. After calling \`request_permission\`, tell the user: "Done — go to the AgentHiFive dashboard to approve the request and connect your account"
+2. If the user agrees, call \`request_capability\` with the matching \`actionTemplateId\` and a reason
+3. After calling \`request_capability\`, tell the user: "Done — go to the AgentHiFive dashboard to approve the request and connect your account"
 4. Do NOT explain manual setup steps, bot tokens, config files, or link to documentation
 
 **If the service is NOT in the Action Template IDs table:**
@@ -348,7 +349,7 @@ When the vault blocks a request, the response includes an \`error\` field and of
 - **Wrong host:** hint lists which hosts have allowlist rules
 - **Rate limited:** hint tells you when to retry (\`retryAfter\` seconds)
 - **Model mismatch:** hint tells you which execution model to use instead
-- **No permission:** call \`request_permission\` to request the needed capability
+- **No permission:** call \`request_capability\` to request the needed capability
 - **Step-up required (202):** hint tells you to re-submit with \`approvalId\` after user approval
 - **Download blocked by approval:** If \`vault_download\` returns a step-up approval (202), tell the user their options:
   1. Approve the download in the AgentHiFive dashboard (you'll retry with the \`approvalId\`)

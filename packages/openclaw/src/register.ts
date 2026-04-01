@@ -317,6 +317,48 @@ function buildVaultTools(client: VaultClient, config: OpenClawPluginConfig) {
       },
     },
     {
+      name: "request_capability",
+      label: "Request Capability",
+      description:
+        "Request access to a new service/capability from the workspace owner. " +
+        "Use when the user asks about a vault-supported service that has no active connection. " +
+        "The workspace owner will see the request in the AgentHiFive dashboard and can connect the service and approve access.",
+      parameters: Type.Object({
+        actionTemplateId: Type.String({ description: "Action template ID from the vault reference (e.g., 'telegram', 'gmail-manage', 'notion-read')" }),
+        reason: Type.String({ description: "Why the agent needs this capability (e.g., 'User wants to send Telegram messages')" }),
+      }),
+      execute: async (
+        _toolCallId: string,
+        params: Record<string, unknown>,
+      ) => {
+        try {
+          const result = await client.post<{ id: string; actionTemplateId: string }>("/v1/agent-permission-requests", {
+            actionTemplateId: params.actionTemplateId as string,
+            reason: params.reason as string,
+          });
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                success: true,
+                requestId: result.id,
+                actionTemplateId: result.actionTemplateId,
+                message: "Permission request submitted. The workspace owner will be notified in the AgentHiFive dashboard. They need to approve the request and connect the service.",
+              }),
+            }],
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({ success: false, error: `Failed to submit capability request: ${message}` }),
+            }],
+          };
+        }
+      },
+    },
+    {
       name: "vault_await_approval",
       label: "Vault Await Approval",
       description:
