@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
     "jsx": "preserve",
     "lib": ["dom", "dom.iterable", "esnext"],
     "types": ["node", "react", "react-dom"],
