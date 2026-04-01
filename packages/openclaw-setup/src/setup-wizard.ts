@@ -479,32 +479,34 @@ export function buildConfigOutput(params: {
     defaults: agentDefaults,
   };
 
-  const hasChannels = params.channels && Object.keys(params.channels).length > 0;
-  const channelConfig = hasChannels
-    ? {
-        agenthifive: {
-          accounts: {
-            default: {
-              enabled: true,
-              baseUrl: params.baseUrl,
-              debug_level: "error",
-              auth: {
-                mode: "agent",
-                agentId: params.agentId,
-                privateKey: Buffer.from(
-                  JSON.stringify(params.privateKey),
-                ).toString("base64"),
-              },
-              providers: params.channels,
-            },
+  // Always write the channel auth block — the plugin needs credentials for
+  // LLM proxy auth even when no channel providers (Telegram/Slack) are configured.
+  const channelProviders = params.channels && Object.keys(params.channels).length > 0
+    ? params.channels
+    : {};
+  const channelConfig = {
+    agenthifive: {
+      accounts: {
+        default: {
+          enabled: true,
+          baseUrl: params.baseUrl,
+          debug_level: "error",
+          auth: {
+            mode: "agent",
+            agentId: params.agentId,
+            privateKey: Buffer.from(
+              JSON.stringify(params.privateKey),
+            ).toString("base64"),
           },
+          providers: channelProviders,
         },
-      }
-    : undefined;
+      },
+    },
+  };
 
   return {
     agents: agentsBlock,
-    ...(channelConfig ? { channels: channelConfig } : {}),
+    channels: channelConfig,
     tools: {
       alsoAllow: ["group:plugins"],
     },
