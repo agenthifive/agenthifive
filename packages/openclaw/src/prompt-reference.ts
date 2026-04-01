@@ -542,17 +542,21 @@ Right: \`POST https://slack.com/api/conversations.history\` with body \`{ "chann
 
 **Channel-runtime first:** If you are already handling a live Telegram conversation through the AgentHiFive channel plugin, reply with the native channel send/reply flow instead of calling \`vault_execute\`.
 
+**Proactive / first-contact messages:** To send a message to a user who hasn't started a conversation yet (or outside an active channel session), use \`vault_execute\` with \`POST https://api.telegram.org/bot/sendMessage\` and body \`{ "chat_id": "<id>", "text": "<message>" }\`. This does NOT require step-up approval when sending to an allowed chat ID. Always use \`Content-Type: application/json\`.
+
 **URL format:** \`https://api.telegram.org/bot/<method>\` — the vault injects the real bot token automatically when you do need a direct API call.
 Do NOT put a token or placeholder in the URL (NOT \`/bot{token}/sendMessage\`, NOT \`/bot123:ABC/sendMessage\`).
 
 **Write operations (POST):**
-- Send message: \`POST https://api.telegram.org/bot/sendMessage\` — body: \`{ chat_id, text, parse_mode }\`
-- Send photo: \`POST https://api.telegram.org/bot/sendPhoto\` — body: \`{ chat_id, photo }\`
-- Forward message: \`POST https://api.telegram.org/bot/forwardMessage\` — body: \`{ chat_id, from_chat_id, message_id }\`
+- Send message: \`POST https://api.telegram.org/bot/sendMessage\` — body: \`{ "chat_id": "<id>", "text": "<message>", "parse_mode": "HTML" }\`
+- Send photo: \`POST https://api.telegram.org/bot/sendPhoto\` — body: \`{ "chat_id": "<id>", "photo": "<url>" }\`
+- Forward message: \`POST https://api.telegram.org/bot/forwardMessage\` — body: \`{ "chat_id": "<id>", "from_chat_id": "<id>", "message_id": <id> }\`
 
 **Read operations (GET):**
 - Get updates: \`GET https://api.telegram.org/bot/getUpdates\` — query: \`{ offset, timeout }\`
 - Get chat: \`GET https://api.telegram.org/bot/getChat\` — query: \`{ chat_id }\`
+
+**Important:** Avoid emoji characters in the \`text\` field — they can cause encoding issues resulting in "message text is empty" errors from Telegram. Use plain text or HTML entities instead.
 
 Use \`service: "telegram"\` with \`vault_execute\` only for direct Telegram API operations outside the normal channel reply flow. Never use a connectionId for Telegram.
 Incoming messages are auto-polled — you do NOT need to call getUpdates yourself.`,
