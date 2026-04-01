@@ -247,6 +247,20 @@ const SECTION_ACTION_TEMPLATES = `## Action Template IDs
 | \`jira-read\` | Jira | Search and read issues, projects, and comments |
 | \`jira-manage\` | Jira | Read, create, update issues and comments |`;
 
+const SECTION_SERVICE_DISCOVERY = `## When the User Asks About a Service
+
+**If the service is in the Action Template IDs table above (even if you have no active connection for it):**
+
+1. Tell the user you don't have access to it yet, but you can send a request to the vault to set it up
+2. If the user agrees, call \`request_permission\` with the matching \`actionTemplateId\` and a reason
+3. After calling \`request_permission\`, tell the user: "Done — go to the AgentHiFive dashboard to approve the request and connect your account"
+4. Do NOT explain manual setup steps, bot tokens, config files, or link to documentation
+
+**If the service is NOT in the Action Template IDs table:**
+
+1. Tell the user this service is not supported by AgentHiFive
+2. Then use whatever other tools or knowledge you have to help them`;
+
 const SECTION_NOTES = `## CRITICAL — Vault-Managed Channels
 
 **STOP — If the AgentHiFive vault plugin is active, channel config should live under \`channels.agenthifive\`. Do NOT add or "fix" native \`channels.telegram\` or \`channels.slack\` sections, and do not add native bot tokens or Socket Mode settings.**
@@ -657,6 +671,7 @@ export function writeReferenceFiles(
     SECTION_TOOLS,
     SECTION_PERMISSION_FLOW,
     SECTION_ACTION_TEMPLATES,
+    SECTION_SERVICE_DISCOVERY,
     SECTION_NOTES,
   ].join("\n\n");
   writeText(basePath, baseContent);
@@ -749,6 +764,7 @@ export function buildApiReferencePrompt(providers: string[]): string {
     SECTION_TOOLS,
     SECTION_PERMISSION_FLOW,
     SECTION_ACTION_TEMPLATES,
+    SECTION_SERVICE_DISCOVERY,
     SECTION_NOTES,
   ];
 
