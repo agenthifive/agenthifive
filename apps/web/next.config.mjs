@@ -2,6 +2,7 @@
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
+  allowedDevOrigins: ['ah5.agenthifive.it', 'app-integration.agenthifive.com'],
   transpilePackages: ['@agenthifive/contracts', '@agenthifive/security'],
   images: {
     unoptimized: true,
