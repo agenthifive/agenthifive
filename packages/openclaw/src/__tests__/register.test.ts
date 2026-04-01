@@ -29,7 +29,7 @@ describe("register (plugin integration)", () => {
     assert.equal(typeof plugin.register, "function");
   });
 
-  it("registers 5 vault tools with bearer auth", () => {
+  it("registers 6 vault tools with bearer auth", () => {
     const registeredTools: { name: string }[] = [];
     const registeredHooks: { event: string; handler: Function }[] = [];
     const logs: string[] = [];
@@ -291,7 +291,7 @@ describe("register (plugin integration)", () => {
 
     plugin.register(mockApi);
 
-    assert.equal(registeredTools.length, 5);
+    assert.equal(registeredTools.length, 6);
     assert.equal(logs.some((msg) => msg.includes("installed but not configured")), false);
   });
 
