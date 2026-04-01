@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@agenthifive/security": ["../../packages/security/src/index.ts"],
+      "@agenthifive/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

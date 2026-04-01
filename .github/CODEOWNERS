@@ -1,0 +1,12 @@
+# Platform-critical paths — require platform team review for any changes.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# CI/CD workflows
+/.github/workflows/    @supersantux @abrawordabra
+
+# Infrastructure as Code
+/infra/tofu/           @supersantux @abrawordabra
+
+# Docker and deployment configs
+/apps/api/Dockerfile   @supersantux @abrawordabra
+/infra/nginx/          @supersantux @abrawordabra

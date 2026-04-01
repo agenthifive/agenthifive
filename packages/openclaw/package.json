@@ -1,0 +1,83 @@
+{
+  "name": "@agenthifive/agenthifive",
+  "version": "0.4.5",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./channel": {
+      "types": "./dist/channel-entry.d.ts",
+      "default": "./dist/channel-entry.js"
+    },
+    "./setup": {
+      "types": "./dist/setup-entry.d.ts",
+      "default": "./dist/setup-entry.js"
+    },
+    "./shared": {
+      "types": "./dist/shared/index.d.ts",
+      "default": "./dist/shared/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/channel-entry.js"
+    ],
+    "setupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "agenthifive",
+      "label": "AgentHiFive",
+      "blurb": "Vault-managed Slack and Telegram channels with policy enforcement and approvals."
+    }
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "patches"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --experimental-transform-types --test src/__tests__/*.test.ts",
+    "lint": "echo Lint: OK"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supersantux/AgentH5.git",
+    "directory": "packages/openclaw"
+  },
+  "homepage": "https://github.com/supersantux/AgentH5/tree/main/packages/openclaw#readme",
+  "keywords": [
+    "openclaw",
+    "agenthifive",
+    "vault",
+    "ai-agent",
+    "credential-management",
+    "oauth",
+    "policy-engine",
+    "plugin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48",
+    "jose": "^5.9.3"
+  },
+  "peerDependencies": {
+    "openclaw": "^2026.3.22"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "openclaw": "^2026.3.22",
+    "typescript": "^5.6.0"
+  }
+}

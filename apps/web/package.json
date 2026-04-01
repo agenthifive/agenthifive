@@ -1,0 +1,31 @@
+{
+  "name": "@agenthifive/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "echo Lint: OK",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agenthifive/contracts": "workspace:*",
+    "@sentry/react": "^10.45.0",
+    "@tanstack/react-query": "^5.0.0",
+    "better-auth": "^1.0.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^2.0.7",
+    "tailwindcss": "^4.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}
