@@ -1,0 +1,56 @@
+--- a/src/agents/model-auth.ts
++++ b/src/agents/model-auth.ts
+@@ -289,7 +289,22 @@
+ }): Promise<ResolvedProviderAuth> {
+   const { provider, cfg, profileId, preferredProfile } = params;
+   const store = params.store ?? ensureAuthProfileStore(params.agentDir);
+
++  // -- AgentHiFive: vault LLM proxy (Model B brokered) --
++  // @agenthifive/agenthifive/runtime @ah5-patch-v4
++  try {
++    const ah5rt = (globalThis as Record<string, unknown>).__ah5_runtime as
++      | { proxiedProviders?: string[]; vaultBearerToken?: string }
++      | undefined;
++    if (ah5rt?.proxiedProviders?.includes(provider) && ah5rt?.vaultBearerToken) {
++      return { apiKey: ah5rt.vaultBearerToken, source: "vault:agent-token", mode: "api-key" };
++    }
++  } catch (ah5Err: unknown) {
++    const msg = ah5Err instanceof Error ? ah5Err.message : String(ah5Err);
++    console.error("[AH5 patch] error:", msg);
++  }
++
+   if (profileId) {
+     const resolved = await resolveApiKeyForProfile({
+       cfg,
+@@ -445,6 +460,29 @@
+ function requireApiKey(auth, provider) {
+   const key = normalizeSecretInput(auth.apiKey);
+   if (key) return key;
+   throw new Error(`No API key resolved for provider "${provider}" (auth mode: ${auth.mode}).`);
+ }
+ function applyLocalNoAuthHeaderOverride(model, auth) {
++  // -- AgentHiFive: inject session + approval replay headers for vault-managed LLM proxy --
++  // @agenthifive/agenthifive/runtime @ah5-patch-v5
++  if (auth?.source === "vault:agent-token") try {
++    const ah5rt = (globalThis as Record<string, unknown>).__ah5_runtime as
++      | { currentSessionKey?: string | null; approvedLlmApprovals?: Record<string, string> }
++      | undefined;
++    const sessionKey = typeof ah5rt?.currentSessionKey === "string" ? ah5rt.currentSessionKey.trim() : "";
++    const approvals = ah5rt?.approvedLlmApprovals && typeof ah5rt.approvedLlmApprovals === "object"
++      ? ah5rt.approvedLlmApprovals
++      : undefined;
++    const approvalId = sessionKey && approvals && typeof approvals[sessionKey] === "string"
++      ? approvals[sessionKey]
++      : undefined;
++    if (approvalId && approvals) delete approvals[sessionKey];
++    if (sessionKey || approvalId) {
++      return { ...model, headers: { ...model.headers, ...(sessionKey ? { "x-ah5-session-key": sessionKey } : {}), ...(approvalId ? { "x-ah5-approval-id": approvalId } : {}) } };
++    }
++  } catch (ah5Err: unknown) {
++    const msg = ah5Err instanceof Error ? ah5Err.message : String(ah5Err);
++    console.error("[AH5 patch] header inject error:", msg);
++  }
++
+   if (auth?.apiKey !== "custom-local" || model.api !== "openai-completions") return model;
+   const headers = {
+     ...model.headers,

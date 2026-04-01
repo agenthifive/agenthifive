@@ -1,0 +1,21 @@
+{
+  "name": "@agenthifive/oauth-connectors",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo Lint: OK"
+  },
+  "dependencies": {
+    "@agenthifive/contracts": "workspace:*",
+    "oauth4webapi": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0"
+  }
+}

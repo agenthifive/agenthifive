@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+html {
+  overflow-y: scroll;
+}
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #dc2626;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-card: #ffffff;
+  --color-card-foreground: #111827;
+  --color-input: #e5e7eb;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

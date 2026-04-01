@@ -1,0 +1,19 @@
+# AgentHiFive Development — PostgreSQL only
+# Apps run natively via `make dev` for fast HMR and debugging.
+services:
+  postgres:
+    image: postgres:15
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    environment:
+      POSTGRES_USER: agenthifive
+      POSTGRES_PASSWORD: dev-password
+      POSTGRES_DB: agenthifive
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agenthifive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
