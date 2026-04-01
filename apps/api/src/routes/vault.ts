@@ -2436,6 +2436,17 @@ async function handleModelB(
   let requestBody = ctx.requestBody;
   const originalRequestBody = ctx.requestBody;
 
+  // DEBUG: log requestBody type for Telegram sendMessage investigation
+  if (connection.provider === "telegram") {
+    request.log.info({
+      requestBodyType: typeof requestBody,
+      requestBodyIsNull: requestBody === null,
+      requestBodyIsUndefined: requestBody === undefined,
+      requestBodyKeys: requestBody && typeof requestBody === "object" ? Object.keys(requestBody as Record<string, unknown>) : null,
+      requestBodyPreview: typeof requestBody === "string" ? requestBody.slice(0, 100) : null,
+    }, "DEBUG.telegramRequestBody");
+  }
+
   if (sessionKey && requestBody && typeof requestBody === "object") {
     const quarantineRows = await db
       .select({ fragments: promptHistoryQuarantines.fragments })
