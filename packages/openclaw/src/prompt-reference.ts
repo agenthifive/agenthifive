@@ -556,8 +556,6 @@ Do NOT put a token or placeholder in the URL (NOT \`/bot{token}/sendMessage\`, N
 - Get updates: \`GET https://api.telegram.org/bot/getUpdates\` — query: \`{ offset, timeout }\`
 - Get chat: \`GET https://api.telegram.org/bot/getChat\` — query: \`{ chat_id }\`
 
-**Important:** Avoid emoji characters in the \`text\` field — they can cause encoding issues resulting in "message text is empty" errors from Telegram. Use plain text or HTML entities instead.
-
 Use \`service: "telegram"\` with \`vault_execute\` only for direct Telegram API operations outside the normal channel reply flow. Never use a connectionId for Telegram.
 Incoming messages are auto-polled — you do NOT need to call getUpdates yourself.`,
 
