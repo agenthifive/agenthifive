@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -45,7 +49,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm turbo run build --filter='./packages/*' --filter='!agenthifive-mcp' --filter='!@agenthifive/agenthifive' --filter='!@agenthifive/openclaw-setup'
+        run: pnpm turbo run build --filter='./packages/*'
 
       - name: Apply migration files
         run: pnpm --filter @agenthifive/api run migrate-apply
@@ -55,25 +59,23 @@ jobs:
       - name: Check migration files are up to date
         run: |
           pnpm --filter @agenthifive/api exec drizzle-kit generate --name ci-drift-check 2>&1
-          # If generate produced new files, migration files are stale
           if git diff --name-only -- 'apps/api/drizzle/' | grep -q .; then
             echo "::error::Migration files are out of date! Run 'make migrate-generate' and commit the result."
             git diff --stat -- 'apps/api/drizzle/'
             exit 1
           fi
-          # Clean up the drift-check file if it was a no-op
           git checkout -- 'apps/api/drizzle/' 2>/dev/null || true
         env:
           DATABASE_URL: postgresql://test:test_password@localhost:5433/agenthifive_test
 
       - name: Lint
-        run: pnpm turbo run lint --filter='!agenthifive-mcp' --filter='!@agenthifive/agenthifive' --filter='!@agenthifive/openclaw-setup'
+        run: pnpm turbo run lint
 
       - name: Typecheck
-        run: pnpm turbo run typecheck --filter='!agenthifive-mcp' --filter='!@agenthifive/agenthifive' --filter='!@agenthifive/openclaw-setup'
+        run: pnpm turbo run typecheck
 
       - name: Test
-        run: pnpm turbo run test --filter='!agenthifive-mcp' --filter='!@agenthifive/agenthifive' --filter='!@agenthifive/openclaw-setup'
+        run: pnpm turbo run test
         env:
           DATABASE_URL: postgresql://test:test_password@localhost:5433/agenthifive_test
 
