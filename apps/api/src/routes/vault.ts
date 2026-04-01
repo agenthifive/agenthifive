@@ -2434,18 +2434,19 @@ async function handleModelB(
   const { sub, connectionId, connection, policy, method, url, query, headers, workspaceId, providerConstraints, approvalId, requestFullFields, sessionKey } = ctx;
   const bypassPiiRedaction = ctx.bypassPiiRedaction === true;
   let requestBody = ctx.requestBody;
-  const originalRequestBody = ctx.requestBody;
 
-  // DEBUG: log requestBody type for Telegram sendMessage investigation
-  if (connection.provider === "telegram") {
-    request.log.info({
-      requestBodyType: typeof requestBody,
-      requestBodyIsNull: requestBody === null,
-      requestBodyIsUndefined: requestBody === undefined,
-      requestBodyKeys: requestBody && typeof requestBody === "object" ? Object.keys(requestBody as Record<string, unknown>) : null,
-      requestBodyPreview: typeof requestBody === "string" ? requestBody.slice(0, 100) : null,
-    }, "DEBUG.telegramRequestBody");
+  // Normalize string body to object — models sometimes pass JSON as a string
+  // instead of a parsed object. Without this, chat ID extraction fails (returns null),
+  // allowlist bypass doesn't trigger, and JSON.stringify double-encodes the body.
+  if (typeof requestBody === "string") {
+    try {
+      requestBody = JSON.parse(requestBody);
+    } catch {
+      // Not valid JSON — leave as string (text/plain will be set later)
+    }
   }
+
+  const originalRequestBody = ctx.requestBody;
 
   if (sessionKey && requestBody && typeof requestBody === "object") {
     const quarantineRows = await db
