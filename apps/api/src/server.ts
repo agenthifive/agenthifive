@@ -93,6 +93,7 @@ async function buildApp() {
     }
     reply.code(statusCode).send({
       error: statusCode >= 500 ? "Internal server error" : error.message,
+      ...((error as Error & { hint?: string }).hint && statusCode < 500 && { hint: (error as Error & { hint?: string }).hint }),
     });
   });
 
