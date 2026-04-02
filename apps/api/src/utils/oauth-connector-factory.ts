@@ -148,11 +148,15 @@ export async function resolveConnector(opts: {
     }
   }
 
-  throw new Error(
+  const err = new Error(
     `No OAuth credentials available for provider "${provider}". ` +
-      `Configure corporate credentials via environment variables, ` +
-      `or add your own OAuth app in Settings.`,
+      `Add your own OAuth app in Settings → Apps.`,
   );
+  (err as Error & { statusCode: number; hint: string }).statusCode = 400;
+  (err as Error & { statusCode: number; hint: string }).hint =
+    `Go to Settings → Apps and add your ${provider === "google" ? "Google" : "Microsoft"} OAuth credentials (Client ID and Client Secret). ` +
+    `This is required to connect ${provider === "google" ? "Google" : "Microsoft"} services.`;
+  throw err;
 }
 
 /**
