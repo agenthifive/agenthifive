@@ -522,8 +522,8 @@ export default function CreateConnectionModal({
                       {!svcOauthOk && entry.credentialType === "oauth" && (
                         <div className="mb-3 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
                           OAuth app not configured for {entry.provider}.{" "}
-                          <a href="/dashboard/settings" className="font-medium underline hover:text-yellow-900">
-                            Set up in Settings
+                          <a href="/dashboard/settings/apps" className="font-medium underline hover:text-yellow-900">
+                            Set up in Settings → Apps
                           </a>
                         </div>
                       )}
