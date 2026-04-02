@@ -197,7 +197,14 @@ export default function AppsPage() {
       {/* Google OAuth App */}
       <div className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-foreground">Google OAuth App</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-foreground">Google OAuth App</h3>
+            <a href="/docs/connections/google" target="_blank" rel="noopener noreferrer" className="text-muted hover:text-foreground" title="Google setup guide">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </a>
+          </div>
           {!showGoogleForm && !hasGoogle && (
             <button
               onClick={() => {
@@ -322,7 +329,14 @@ export default function AppsPage() {
       {/* Microsoft OAuth App */}
       <div className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-foreground">Microsoft OAuth App</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-foreground">Microsoft OAuth App</h3>
+            <a href="/docs/connections/microsoft" target="_blank" rel="noopener noreferrer" className="text-muted hover:text-foreground" title="Microsoft setup guide">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </a>
+          </div>
           {!showMicrosoftForm && !hasMicrosoft && (
             <button
               onClick={() => {
