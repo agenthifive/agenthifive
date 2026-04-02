@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/docs/static/img/logo.svg" alt="AgentHiFive" width="80" />
+  <img src="apps/docs/static/img/logo.png" alt="AgentHiFive" width="80" />
 </p>
 
 <h1 align="center">AgentHiFive</h1>
