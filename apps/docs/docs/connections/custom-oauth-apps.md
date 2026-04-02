@@ -13,30 +13,18 @@ By default, AgentHiFive uses the instance-wide OAuth credentials configured by y
 You only need custom OAuth apps if your AgentHiFive instance does not have Google or Microsoft OAuth credentials pre-configured. If "Connect" buttons on the Connections page already work, you're all set.
 :::
 
-## Google
+## Setup
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create or select a project
-2. Enable the APIs you need (Gmail API, Google Calendar API, Google Drive API, Google Sheets API, Google Docs API)
-3. Go to **Credentials** → **Create Credentials** → **OAuth Client ID**
-4. Application type: **Web application**
-5. Under **Authorized redirect URIs**, add the callback URL shown in your AgentHiFive Settings page
-6. Copy the **Client ID** and **Client Secret**
-7. In AgentHiFive, go to **Settings** → **Google OAuth App** and paste them
+1. Go to **Settings** → **Apps** in the AgentHiFive dashboard
+2. Note the **Callback URL** shown at the top — you'll need it when creating your OAuth app
+3. Follow the provider-specific guide:
 
-## Microsoft
+| Provider | Services | Guide |
+|----------|----------|-------|
+| **Google** | Gmail, Calendar, Drive, Sheets, Docs, Contacts | [Google Workspace setup guide](/connections/google#oauth-setup-admin) |
+| **Microsoft** | Outlook Mail, Calendar, Contacts, OneDrive, Teams | [Microsoft setup guide](/connections/microsoft#oauth-setup-admin) |
 
-1. Go to [Azure Portal → App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
-2. Name: anything you like (e.g. `AgentHiFive`)
-3. Supported account types: choose based on your needs (single tenant, multi-tenant, or personal accounts)
-4. Redirect URI: paste the callback URL shown in your AgentHiFive Settings page (platform type: **Web**)
-5. After registration, go to **Certificates & secrets** → **New client secret** and copy the value
-6. Add any **API permissions** you need (Microsoft Graph: `Mail.Read`, `Mail.Send`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Chat.ReadWrite`, etc.)
-7. Copy the **Application (client) ID**, **Client Secret**, and optionally the **Directory (tenant) ID**
-8. In AgentHiFive, go to **Settings** → **Microsoft OAuth App** and paste them
-
-:::tip Tenant ID
-If you leave Tenant ID empty, AgentHiFive defaults to `common`, which allows any Microsoft account (work, school, or personal) to sign in. Set a specific tenant ID to restrict to your organization.
-:::
+4. Paste your Client ID and Client Secret into the corresponding form in **Settings** → **Apps**
 
 ## How It Works
 
