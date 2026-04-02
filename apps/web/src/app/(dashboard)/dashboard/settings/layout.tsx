@@ -20,7 +20,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="mt-6 border-b border-border">
         <nav className="-mb-px flex gap-6">
           {TABS.map((tab) => {
-            const isActive = pathname === tab.href;
+            const isActive = pathname === tab.href || pathname === tab.href + "/";
             return (
               <Link
                 key={tab.href}
