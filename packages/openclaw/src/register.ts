@@ -51,7 +51,7 @@ import type {
 
 const DEFAULT_BASE_URL = "https://app.agenthifive.com";
 const PLUGIN_ID = "agenthifive";
-const PLUGIN_VERSION = "0.4.5";
+const PLUGIN_VERSION = "0.4.6";
 
 function normalizeDebugLevel(raw: unknown): VaultDebugLevel | undefined {
   if (typeof raw !== "string") return undefined;
