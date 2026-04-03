@@ -185,8 +185,8 @@ function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): Ah5Chan
     enabled: raw.enabled !== false,
     baseUrl: (raw.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, ""),
     auth: normalizeAuth(raw.auth),
-    telegramEnabled: telegram?.enabled !== false,
-    slackEnabled: slack?.enabled !== false,
+    telegramEnabled: telegram?.enabled === true,
+    slackEnabled: slack?.enabled === true,
     dmPolicy: telegram?.dmPolicy?.trim() || "balanced",
     allowFrom: (telegram?.allowFrom ?? []).map((entry) => String(entry)).filter(Boolean),
     debugLevel: normalizeDebugLevel(raw.debug_level ?? raw.debugLevel),
@@ -245,17 +245,18 @@ function applySetupConfig(params: {
     };
   }
 
-  if (!next.providers) {
-    next.providers = { telegram: { enabled: true }, slack: { enabled: true } };
+  if (next.providers?.telegram) {
+    next.providers.telegram = {
+      enabled: next.providers.telegram.enabled === true,
+      dmPolicy: next.providers.telegram.dmPolicy ?? "balanced",
+      allowFrom: next.providers.telegram.allowFrom ?? [],
+    };
   }
-  next.providers.telegram = {
-    enabled: next.providers.telegram?.enabled !== false,
-    dmPolicy: next.providers.telegram?.dmPolicy ?? "balanced",
-    allowFrom: next.providers.telegram?.allowFrom ?? [],
-  };
-  next.providers.slack = {
-    enabled: next.providers.slack?.enabled !== false,
-  };
+  if (next.providers?.slack) {
+    next.providers.slack = {
+      enabled: next.providers.slack.enabled === true,
+    };
+  }
 
   accounts[params.accountId] = next;
   return root;
