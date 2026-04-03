@@ -526,6 +526,18 @@ export function buildConfigOutput(params: {
       entries: {
         agenthifive: {
           enabled: true,
+          config: {
+            baseUrl: params.baseUrl,
+            auth: {
+              mode: "agent",
+              agentId: params.agentId,
+              privateKey: Buffer.from(
+                JSON.stringify(params.privateKey),
+              ).toString("base64"),
+            },
+            connectedProviders: params.connectedProviders,
+            proxiedProviders: params.proxiedProviders,
+          },
         },
       },
     },
