@@ -591,6 +591,15 @@ export function buildAgentHiFiveChannelPlugin(sdk: Pick<OpenClawSdkCoreModule, "
             approvalProxy.stop();
           },
         });
+
+        // OpenClaw expects channel startAccount tasks to stay alive until shutdown.
+        // Returning immediately makes the gateway think the account exited cleanly
+        // and triggers its auto-restart loop.
+        if (!signal.aborted) {
+          await new Promise<void>((resolve) => {
+            signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+        }
       },
       async stopAccount(ctx) {
         const key = `${ctx.accountId}`;
