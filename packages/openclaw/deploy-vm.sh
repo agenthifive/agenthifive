@@ -142,7 +142,7 @@ find /home/osboxes -maxdepth 1 -name 'agenthifive-agenthifive-*.tgz' ! -name "$P
 find /home/osboxes -maxdepth 1 -name 'agenthifive-openclaw-setup-*.tgz' ! -name "$SETUP_TARBALL_NAME" -delete
 
 echo "  [5] Removing AH5 config entries..."
-npx --package="$SETUP_TARBALL" ah5-setup --mode remove --non-interactive 2>/dev/null || true
+npx --yes --package="$SETUP_TARBALL" ah5-setup --mode remove --non-interactive 2>/dev/null || true
 
 echo "  [5] Uninstalling old plugin..."
 openclaw plugins uninstall agenthifive --force 2>/dev/null || true
@@ -151,7 +151,7 @@ echo "  [5] Installing plugin from tarball..."
 openclaw plugins install "/home/osboxes/$PLUGIN_TARBALL_NAME"
 
 echo "  [6] Running setup (reconnect)..."
-npx --package="$SETUP_TARBALL" ah5-setup \
+npx --yes --package="$SETUP_TARBALL" ah5-setup \
   --mode reconnect
   --base-url "$AH5_BASE_URL"
   --bootstrap-secret "$BOOTSTRAP_SECRET"
