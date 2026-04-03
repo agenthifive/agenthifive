@@ -81,6 +81,35 @@ export default function DashboardLayout({
   }, [showAdvancedMenu, showUserMenu]);
 
   if (isPending || !session) {
+    if (error && !isPending) {
+      return (
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className="max-w-md rounded-lg border border-border bg-card p-6 text-center shadow-sm">
+            <h1 className="text-lg font-semibold text-foreground">We could not verify your session</h1>
+            <p className="mt-2 text-sm text-muted">
+              The dashboard could not reach the authentication service. Try refreshing the page,
+              and if that does not help, sign in again.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                Refresh
+              </button>
+              <Link
+                href="/login"
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Go to login
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-muted">Loading...</div>

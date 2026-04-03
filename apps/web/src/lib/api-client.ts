@@ -20,7 +20,7 @@ function isTransientError(err: unknown): boolean {
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0;
 // In-flight deduplication: concurrent callers await the same promise instead
-// of each firing a separate /api/auth/token request on the initial page load.
+// of each firing a separate /v1/auth/token request on the initial page load.
 let tokenFetchPromise: Promise<string> | null = null;
 
 /**
@@ -41,7 +41,7 @@ async function getToken(): Promise<string> {
   if (tokenFetchPromise) return tokenFetchPromise;
 
   tokenFetchPromise = (async () => {
-    const res = await fetch("/api/auth/token", { method: "POST" });
+    const res = await fetch("/v1/auth/token", { method: "POST" });
 
     if (res.status === 401) {
       // Session is dead — clear cookies and redirect to login
