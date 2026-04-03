@@ -32,7 +32,14 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type SetupMode = "setup" | "change-model" | "reconnect" | "sync" | "verify" | "remove";
+export type SetupMode =
+  | "setup"
+  | "configure-connections"
+  | "change-model"
+  | "reconnect"
+  | "sync"
+  | "verify"
+  | "remove";
 
 export interface SetupOptions {
   mode?: SetupMode;
@@ -1107,23 +1114,94 @@ async function showMenu(log: LogFn): Promise<SetupMode> {
   log("");
   log("  What would you like to do?");
   log("");
-  log("    1) Connect to vault     Install plugin + auth + config + patch");
-  log("    2) Change default LLM   Re-pick model, update config");
-  log("    3) Reconnect to vault   New bootstrap secret, re-auth");
-  log("    4) Sync connections     Re-fetch vault connections, update config");
-  log("    5) Verify installation  Check everything is working");
-  log("    6) Remove AgentHiFive   Cleanly remove channel config + uninstall plugin");
+  log("    1) First connection to vault   Install plugin + auth + config + patch");
+  log("    2) Configure vault connections Change default LLM, connect/remove channels");
+  log("    3) Reconnect to vault          New bootstrap secret, re-auth");
+  log("    4) Verify installation         Check everything is working");
+  log("    5) Remove AgentHiFive          Cleanly remove channel config + uninstall plugin");
   log("");
 
   const answer = await prompt("  Enter number", "1");
   switch (answer) {
-    case "2": return "change-model";
+    case "2": return "configure-connections";
     case "3": return "reconnect";
-    case "4": return "sync";
-    case "5": return "verify";
-    case "6": return "remove";
+    case "4": return "verify";
+    case "5": return "remove";
     default: return "setup";
   }
+}
+
+type ConfigureConnectionsAction =
+  | { kind: "done" }
+  | { kind: "change-model" }
+  | { kind: "toggle-channel"; service: string };
+
+function getExistingVaultManagedProviders(
+  config: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const channels = config.channels as Record<string, unknown> | undefined;
+  const agenthifive = channels?.agenthifive as Record<string, unknown> | undefined;
+  const accounts = agenthifive?.accounts as Record<string, unknown> | undefined;
+  const defaultAccount = accounts?.default as Record<string, unknown> | undefined;
+  const providers = defaultAccount?.providers as Record<string, unknown> | undefined;
+
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const [service, value] of Object.entries(providers ?? {})) {
+    if (value && typeof value === "object") {
+      result[service] = { ...(value as Record<string, unknown>) };
+    }
+  }
+  return result;
+}
+
+function channelDisplayName(service: string): string {
+  return service.charAt(0).toUpperCase() + service.slice(1);
+}
+
+async function showConfigureConnectionsMenu(
+  log: LogFn,
+  channelServices: string[],
+  existingConfig: Record<string, unknown>,
+): Promise<ConfigureConnectionsAction> {
+  const existingChannels = (existingConfig.channels ?? {}) as Record<string, unknown>;
+
+  log("");
+  log("  Configure Vault Connections");
+  log("  " + "-".repeat(40));
+  log("");
+  log("    0) Done");
+  log("    1) Change default LLM");
+
+  let optionNumber = 2;
+  const options = new Map<number, ConfigureConnectionsAction>([
+    [0, { kind: "done" }],
+    [1, { kind: "change-model" }],
+  ]);
+
+  for (const service of channelServices) {
+    if (!(service in CHANNEL_CONFIGS)) continue;
+
+    const enabled = isVaultManagedChannel(service, existingChannels);
+    const displayName = channelDisplayName(service);
+    const description = enabled
+      ? "Remove from this OpenClaw config"
+      : `Connect ${displayName} from the vault`;
+
+    log(`    ${optionNumber}) ${enabled ? "Remove" : "Connect"} ${displayName.padEnd(14)} ${description}`);
+    options.set(optionNumber, { kind: "toggle-channel", service });
+    optionNumber += 1;
+  }
+
+  if (options.size === 2) {
+    log("");
+    log("  No channel connections are currently available for this agent.");
+  }
+
+  log("");
+
+  const answer = await prompt("  Enter number", "0");
+  const idx = parseInt(answer, 10);
+  return options.get(idx) ?? { kind: "done" };
 }
 
 // ---------------------------------------------------------------------------
@@ -1463,6 +1541,149 @@ async function runChangeModel(opts: SetupOptions): Promise<void> {
   logDone(log, defaultModel, proxiedProviders);
 }
 
+async function runConfigureConnections(opts: SetupOptions): Promise<void> {
+  if (opts.nonInteractive) {
+    throw new Error(
+      "Configure vault connections requires interactive mode. " +
+        "Use --mode change-model or --mode sync for scripted flows.",
+    );
+  }
+
+  const log: LogFn = (msg) => process.stdout.write(`${msg}\n`);
+
+  log("");
+  log("  Configure Vault Connections");
+  log("  " + "-".repeat(40));
+  log("");
+
+  const configPath = resolveConfigPath(opts);
+  const existingAuth = extractExistingAuth(configPath);
+
+  if (!existingAuth) {
+    throw new Error(
+      "No existing AgentHiFive config found. Run first-time setup first.\n\n" +
+        "  ah5-setup\n",
+    );
+  }
+
+  log(`  Config: ${configPath}`);
+  log(`  Vault:  ${existingAuth.baseUrl}`);
+  log(`  Agent:  ${existingAuth.agentId.slice(0, 8)}...`);
+  log("");
+
+  log("  Fetching vault connections...");
+  const tokenManager = new VaultTokenManager({
+    baseUrl: existingAuth.baseUrl,
+    agentId: existingAuth.agentId,
+    privateKey: existingAuth.privateKey,
+    tokenAudience: existingAuth.baseUrl,
+  });
+
+  try {
+    await tokenManager.init();
+  } catch (err) {
+    tokenManager.stop();
+    throw new Error(
+      `Could not authenticate with vault: ${err instanceof Error ? err.message : String(err)}. ` +
+        "You may need to reconnect (option 3).",
+    );
+  }
+
+  let vaultConnections: VaultConnection[] = [];
+  try {
+    vaultConnections = await fetchCapabilities(
+      existingAuth.baseUrl,
+      tokenManager.getToken(),
+    );
+  } catch (err) {
+    throw new Error(
+      `Could not fetch capabilities: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  } finally {
+    tokenManager.stop();
+  }
+
+  logConnections(log, vaultConnections);
+  const { connections, connectedProviders, proxiedProviders, channelServices } =
+    classifyConnections(vaultConnections);
+  const providerModels = resolveProviderModels(proxiedProviders);
+  const existingConfig = readExistingConfig(configPath);
+
+  const action = await showConfigureConnectionsMenu(log, channelServices, existingConfig);
+
+  if (action.kind === "done") {
+    log("  No changes made.");
+    return;
+  }
+
+  if (action.kind === "change-model") {
+    const defaultModel = await pickDefaultModel(log, proxiedProviders, providerModels, opts);
+
+    if (!defaultModel) {
+      log("  No model selected.");
+      return;
+    }
+
+    const agentsUpdate = {
+      agents: { defaults: { model: defaultModel } },
+      tools: { alsoAllow: ["group:plugins"] },
+    };
+    const merged = mergePluginConfig(existingConfig, agentsUpdate);
+
+    writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
+
+    log("");
+    log(`  Default model updated to: ${defaultModel}`);
+    log(`  Config saved: ${configPath}`);
+    logDone(log, defaultModel, proxiedProviders);
+    return;
+  }
+
+  const currentProviders = getExistingVaultManagedProviders(existingConfig);
+  const displayName = channelDisplayName(action.service);
+  let actionSummary: string;
+
+  if (action.service in currentProviders) {
+    delete currentProviders[action.service];
+    actionSummary = `${displayName} removed from this OpenClaw config`;
+  } else {
+    const template = CHANNEL_CONFIGS[action.service];
+    if (!template) {
+      throw new Error(`Unsupported channel service: ${action.service}`);
+    }
+    currentProviders[action.service] = { ...template.config };
+    actionSummary = `${displayName} connected from the vault`;
+  }
+
+  const existingAgents = (existingConfig.agents as Record<string, unknown>) ?? {};
+  const existingDefaults = (existingAgents.defaults as Record<string, unknown>) ?? {};
+  const defaultModel = (existingDefaults.model as string) ?? undefined;
+
+  const configBlock = buildConfigOutput({
+    baseUrl: existingAuth.baseUrl,
+    agentId: existingAuth.agentId,
+    privateKey: existingAuth.privateKey,
+    connections,
+    connectedProviders,
+    proxiedProviders,
+    defaultModel,
+    channels: currentProviders,
+    providerModels,
+  });
+
+  writeConfig(log, configPath, configBlock as Record<string, unknown>, {
+    agentId: existingAuth.agentId,
+    baseUrl: existingAuth.baseUrl,
+    connectedProviders,
+    proxiedProviders,
+    defaultModel,
+  });
+
+  log("");
+  log(`  ${actionSummary}.`);
+  logDone(log, defaultModel, proxiedProviders);
+}
+
 // ---------------------------------------------------------------------------
 // Mode 4: Sync connections (re-fetch capabilities, update config)
 // ---------------------------------------------------------------------------
@@ -1776,6 +1997,8 @@ export async function runSetup(opts: SetupOptions = {}): Promise<void> {
   }
 
   switch (mode) {
+    case "configure-connections":
+      return runConfigureConnections(opts);
     case "change-model":
       return runChangeModel(opts);
     case "reconnect":
@@ -1850,7 +2073,15 @@ export function parseSetupArgs(args: string[]): SetupOptions {
       if (val) opts.defaultModel = val;
     } else if (arg === "--mode" && args[i + 1]) {
       const val = args[++i] as SetupMode;
-      if (val === "setup" || val === "change-model" || val === "reconnect" || val === "verify" || val === "sync" || val === "remove") {
+      if (
+        val === "setup"
+        || val === "configure-connections"
+        || val === "change-model"
+        || val === "reconnect"
+        || val === "verify"
+        || val === "sync"
+        || val === "remove"
+      ) {
         opts.mode = val;
       }
     } else if (arg === "--non-interactive") {

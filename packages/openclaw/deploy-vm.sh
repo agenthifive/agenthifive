@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Deploy @agenthifive/openclaw plugin to the local VirtualBox VM.
 #
-# Usage: bash deploy-vm.sh [-e integration|vps]
+# Usage: bash deploy-vm.sh [-e integration|ah5|prod]
 #
 # Environments:
 #   integration  (default) — app-integration.agenthifive.com
-#   vps                    — ah5.agenthifive.it
+#   ah5                    — ah5.agenthifive.it
+#   prod                   — app.agenthifive.com
 #
 # Steps:
 #   1. Build + pack both plugin and setup tarballs
-#   2. Generate fresh bootstrap secret via AH5 API
+#   2. Use provided bootstrap secret, or generate a fresh one via AH5 API
 #   3. SCP tarballs to VM
 #   4. Stop gateway, clean config, uninstall old plugin, remove old tarballs
 #   5. Install plugin from new tarball
@@ -28,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: bash deploy-vm.sh [-e integration|vps]" >&2
+      echo "Usage: bash deploy-vm.sh [-e integration|ah5|prod]" >&2
       exit 1
       ;;
   esac
@@ -38,21 +39,32 @@ done
 case "$ENVIRONMENT" in
   integration)
     AH5_BASE_URL="https://app-integration.agenthifive.com"
-    AH5_PERSONAL_TOKEN="ah5p_lejiTpJLZq2MiLKkwxi_0FussLNULWTVT7_ed7V3hXw"
+    AH5_PERSONAL_TOKEN=""
     AH5_AGENT_ID="f729a53d-35cc-4782-8116-b63d81975386"
     ;;
-  vps)
+  ah5|vps)
     AH5_BASE_URL="https://ah5.agenthifive.it"
-    AH5_PERSONAL_TOKEN="ah5p_EfzlFyVRTGFNKqeUu-KpUXSQI9yY8P9jkFwjVwuDjgY"
+    AH5_PERSONAL_TOKEN=""
     AH5_AGENT_ID="a145df5b-a9f5-4434-b454-08a42707c668"
     ;;
+  prod)
+    AH5_BASE_URL="https://app.agenthifive.com"
+    AH5_PERSONAL_TOKEN=""
+    AH5_AGENT_ID="6aa2dc95-8eb5-47fb-a85c-2039c06d71a7"
+    ;;
   *)
-    echo "Unknown environment: $ENVIRONMENT (expected: integration, vps)" >&2
+    echo "Unknown environment: $ENVIRONMENT (expected: integration, ah5, prod)" >&2
     exit 1
     ;;
 esac
 
+AH5_BASE_URL="${AH5_BASE_URL_OVERRIDE:-$AH5_BASE_URL}"
+AH5_PERSONAL_TOKEN="${AH5_PERSONAL_TOKEN_OVERRIDE:-${AH5_PERSONAL_TOKEN:-}}"
+AH5_AGENT_ID="${AH5_AGENT_ID_OVERRIDE:-${AH5_AGENT_ID:-}}"
+BOOTSTRAP_SECRET="${AH5_BOOTSTRAP_SECRET:-}"
+
 echo "=== Environment: $ENVIRONMENT ($AH5_BASE_URL) ==="
+echo "=== Setup mode: scripted reconnect ==="
 
 # --- Config ---
 VM_USER="osboxes"
@@ -84,13 +96,23 @@ SETUP_TARBALL=$(pnpm pack --pack-destination /tmp 2>&1 | tail -1)
 SETUP_TARBALL_NAME=$(basename "$SETUP_TARBALL")
 echo "  setup:   $SETUP_TARBALL"
 
-# --- 2. Generate bootstrap secret ---
-echo "=== 2. Generate bootstrap secret ==="
-BOOTSTRAP_SECRET=$(curl -sfL -X POST \
-  "$AH5_BASE_URL/v1/agents/$AH5_AGENT_ID/bootstrap-secret" \
-  -H "Authorization: Bearer $AH5_PERSONAL_TOKEN" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['bootstrapSecret'])")
-echo "  got: ${BOOTSTRAP_SECRET:0:10}..."
+# --- 2. Get bootstrap secret ---
+echo "=== 2. Bootstrap secret ==="
+if [[ -n "$BOOTSTRAP_SECRET" ]]; then
+  echo "  using AH5_BOOTSTRAP_SECRET from environment"
+else
+  if [[ -z "$AH5_PERSONAL_TOKEN" || -z "$AH5_AGENT_ID" ]]; then
+    echo "Missing credentials to generate bootstrap secret." >&2
+    echo "Set AH5_BOOTSTRAP_SECRET, or set AH5_PERSONAL_TOKEN_OVERRIDE and AH5_AGENT_ID_OVERRIDE." >&2
+    exit 1
+  fi
+
+  BOOTSTRAP_SECRET=$(curl -sfL -X POST \
+    "$AH5_BASE_URL/v1/agents/$AH5_AGENT_ID/bootstrap-secret" \
+    -H "Authorization: Bearer $AH5_PERSONAL_TOKEN" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['bootstrapSecret'])")
+  echo "  generated: ${BOOTSTRAP_SECRET:0:10}..."
+fi
 
 # --- 3. Upload tarballs ---
 echo "=== 3. Upload tarballs ==="
@@ -130,12 +152,12 @@ openclaw plugins install "/home/osboxes/$PLUGIN_TARBALL_NAME"
 
 echo "  [6] Running setup (reconnect)..."
 npx --package="$SETUP_TARBALL" ah5-setup \
-  --mode reconnect \
-  --base-url "$AH5_BASE_URL" \
-  --bootstrap-secret "$BOOTSTRAP_SECRET" \
-  --default-model "$DEFAULT_MODEL" \
-  --non-interactive \
+  --mode reconnect
+  --base-url "$AH5_BASE_URL"
+  --bootstrap-secret "$BOOTSTRAP_SECRET"
+  --default-model "$DEFAULT_MODEL"
   --skip-plugin-install
+  --non-interactive
 
 echo "  [7] Starting gateway..."
 openclaw gateway start

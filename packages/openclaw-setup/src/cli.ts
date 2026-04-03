@@ -6,7 +6,7 @@
  * Standalone CLI for managing OpenClaw + AgentHiFive vault integration.
  *
  * Modes:
- *   (interactive menu)  — first-time setup, change LLM, reconnect, or remove
+ *   (interactive menu)  — first connection, configure connections, reconnect, verify, or remove
  *   --verify            — check an existing installation (no changes)
  *   --sync              — re-fetch vault connections, update config
  *
@@ -33,6 +33,7 @@ if (args.includes("--help") || args.includes("-h")) {
   Usage:
     ah5-setup                                      Interactive menu
     ah5-setup --base-url <url> --bootstrap-secret <secret>   First-time setup
+    ah5-setup --mode configure-connections         Interactive connection/configuration menu
     ah5-setup --mode change-model                  Change default LLM model
     ah5-setup --mode reconnect --bootstrap-secret <secret>   Reconnect to vault
     ah5-setup --sync                               Re-fetch connections, update config
@@ -41,6 +42,7 @@ if (args.includes("--help") || args.includes("-h")) {
 
   Modes (--mode):
     setup              First-time setup (default when --base-url given)
+    configure-connections Interactive menu to change default LLM or toggle channels
     change-model       Re-pick default LLM model using existing auth
     reconnect          New bootstrap secret, re-auth, update config
     sync               Re-fetch vault connections, update channels + providers
