@@ -152,11 +152,11 @@ openclaw plugins install "/home/osboxes/$PLUGIN_TARBALL_NAME"
 
 echo "  [6] Running setup (reconnect)..."
 npx --yes --package="$SETUP_TARBALL" ah5-setup \
-  --mode reconnect
-  --base-url "$AH5_BASE_URL"
-  --bootstrap-secret "$BOOTSTRAP_SECRET"
-  --default-model "$DEFAULT_MODEL"
-  --skip-plugin-install
+  --mode reconnect \
+  --base-url "$AH5_BASE_URL" \
+  --bootstrap-secret "$BOOTSTRAP_SECRET" \
+  --default-model "$DEFAULT_MODEL" \
+  --skip-plugin-install \
   --non-interactive
 
 echo "  [7] Starting gateway..."
