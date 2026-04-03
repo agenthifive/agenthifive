@@ -436,11 +436,17 @@ async function checkVaultConnectivity(configPath: string | null): Promise<void> 
     return;
   }
 
+  const channels = config.channels as Record<string, unknown> | undefined;
+  const agenthifiveChannel = channels?.agenthifive as Record<string, unknown> | undefined;
+  const accounts = agenthifiveChannel?.accounts as Record<string, unknown> | undefined;
+  const defaultAccount = accounts?.default as Record<string, unknown> | undefined;
+  const channelBaseUrl = defaultAccount?.baseUrl as string | undefined;
+
   const plugins = config.plugins as Record<string, unknown> | undefined;
   const entries = plugins?.entries as Record<string, unknown> | undefined;
   const ah5 = entries?.agenthifive as Record<string, unknown> | undefined;
   const pluginConfig = ah5?.config as Record<string, unknown> | undefined;
-  const baseUrl = pluginConfig?.baseUrl as string | undefined;
+  const baseUrl = channelBaseUrl ?? (pluginConfig?.baseUrl as string | undefined);
 
   if (!baseUrl) {
     info("(skipped — no vault baseUrl)");

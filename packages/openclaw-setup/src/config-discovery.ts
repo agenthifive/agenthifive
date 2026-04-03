@@ -190,9 +190,17 @@ export function mergePluginConfig(
     const models = {
       ...((result.models as Record<string, unknown>) ?? {}),
     };
-    const providers = {
-      ...((models.providers as Record<string, unknown>) ?? {}),
-    };
+    const existingProviders = (models.providers as Record<string, unknown>) ?? {};
+    const providers: Record<string, unknown> = {};
+
+    // Drop previously vault-managed providers so reconnecting to a different
+    // vault/environment replaces them instead of accumulating stale entries.
+    for (const [key, value] of Object.entries(existingProviders)) {
+      const provider = value as Record<string, unknown> | undefined;
+      if (provider?.apiKey === "vault-managed") continue;
+      providers[key] = value;
+    }
+
     const srcProviders = srcModels.providers as Record<string, unknown>;
     for (const [key, value] of Object.entries(srcProviders)) {
       providers[key] = value;
@@ -246,8 +254,11 @@ export function mergePluginConfig(
   if (srcChannels && Object.keys(srcChannels).length > 0) {
     const channels = {
       ...((result.channels as Record<string, unknown>) ?? {}),
-      ...srcChannels,
     };
+
+    // Replace the AgentHiFive channel block entirely so reconnects don't keep
+    // stale providers or old environment settings.
+    channels.agenthifive = srcChannels.agenthifive;
     result.channels = channels;
 
     // Remove native plugin entries for vault-managed channels.
@@ -270,10 +281,10 @@ export function mergePluginConfig(
         if (ch !== "agenthifive" && ch in channels) {
           delete channels[ch];
         }
-        if (entries && ch in entries) {
+        if (entries && ch !== "agenthifive" && ch in entries) {
           delete entries[ch];
         }
-        if (allow) {
+        if (allow && ch !== "agenthifive") {
           const idx = allow.indexOf(ch);
           if (idx !== -1) allow.splice(idx, 1);
         }
