@@ -12,15 +12,15 @@ AgentHiFive uses **GitHub Actions** for continuous integration and continuous de
 ## CI Pipeline
 
 **Workflow:** `.github/workflows/ci.yml`
-**Triggers:** Manual dispatch (`workflow_dispatch`)
+**Triggers:** Push to `main`, pull requests targeting `main`, and manual dispatch (`workflow_dispatch`)
 **Concurrency:** Grouped by ref with cancel-in-progress enabled
 
 ### Jobs
 
-The CI pipeline runs two parallel jobs: **lint-typecheck-test** (main CI with PostgreSQL) and **docs-build** (Docusaurus build verification). The main job has six stages:
+The CI pipeline runs one job: **lint-typecheck-test** (CI with PostgreSQL). The job has five stages:
 
 ```
-Install --> Build Packages --> Apply Migrations --> Check Drift --> Lint + Typecheck --> Test
+Install --> Build Packages --> Apply Migrations --> Lint + Typecheck --> Test
 ```
 
 ### Stages
@@ -41,19 +41,18 @@ Dependencies are installed with `--frozen-lockfile` to ensure reproducible build
 #### 2. Build Shared Packages
 
 ```yaml
-- run: pnpm turbo run build --filter='./packages/*'
+- run: pnpm turbo run build --filter='./core/packages/*'
 ```
 
 Shared packages (`contracts`, `security`, `sdk`, `oauth-connectors`) are built before linting or testing, since apps import from their build output.
 
-#### 3. Apply Migrations and Check Drift
+#### 3. Apply Migrations
 
 ```yaml
 - run: pnpm --filter @agenthifive/api run migrate-apply
-- run: pnpm --filter @agenthifive/api exec drizzle-kit generate --name ci-drift-check
 ```
 
-Migration files are applied to the test database, then `drizzle-kit generate` verifies no schema drift. If new migration files are generated, the build fails — run `make migrate-generate` locally and commit.
+Migration files are applied to the test database.
 
 #### 4. Lint and Typecheck
 
@@ -64,7 +63,7 @@ Migration files are applied to the test database, then `drizzle-kit generate` ve
 
 These commands run across the entire monorepo via Turborepo.
 
-#### 5. Test
+#### 5. Test (core)
 
 ```yaml
 - run: pnpm turbo run test
@@ -148,13 +147,13 @@ The API Docker image is built and tagged with both the commit SHA and `latest`:
 
 | Service | Dockerfile | Image |
 |---------|-----------|-------|
-| API | `apps/api/Dockerfile` | `acrah5.azurecr.io/api` |
+| API | `apps/enterprise-api/Dockerfile` | `acrah5.azurecr.io/api` |
 
 ```yaml
 - uses: docker/build-push-action@v5
   with:
     context: .
-    file: apps/api/Dockerfile
+    file: apps/enterprise-api/Dockerfile
     push: true
     tags: |
       acrah5.azurecr.io/api:${{ github.sha }}
@@ -190,8 +189,8 @@ Individual jobs have timeouts: 20 min (API build), 15 min (SPA builds), 15 min (
 | CI Step | Local Command |
 |---------|---------------|
 | Install | `pnpm install` |
-| Build packages | `pnpm turbo run build --filter='./packages/*'` |
+| Build packages | `pnpm turbo run build --filter='./core/packages/*'` |
 | Lint | `pnpm lint` |
 | Typecheck | `pnpm typecheck` |
 | Test | `cd apps/api && bash run-tests.sh` |
-| Docker build | `docker build -f apps/api/Dockerfile .` |
+| Docker build | `docker build -f apps/enterprise-api/Dockerfile .`  |

@@ -2,12 +2,12 @@
 title: Google Workspace
 sidebar_position: 2
 sidebar_label: Google Workspace
-description: Connect Gmail, Google Calendar, Google Drive, Google Sheets, and Google Docs to AgentHiFive.
+description: Connect Gmail, Google Calendar, Google Drive, Google Sheets, Google Docs, and Google Contacts to AgentHiFive.
 ---
 
 # Google Workspace
 
-Connect your Google account to let agents access Gmail, Google Calendar, Google Drive, Google Sheets, and Google Docs.
+Connect your Google account to let agents access Gmail, Google Calendar, Google Drive, Google Sheets, Google Docs, and Google Contacts.
 
 ## Prerequisites
 
@@ -47,11 +47,12 @@ Google services support **multiple connections** per workspace (e.g., connect bo
 
 | Service ID | Scopes Requested | Capabilities |
 |-----------|-----------------|-------------|
-| `google-gmail` | `gmail.readonly` or `gmail.modify` | Read messages, search, send emails, manage labels |
-| `google-calendar` | `calendar.readonly` or `calendar.events` | Read events, create/modify events |
-| `google-drive` | `drive.readonly` or `drive.file` | List files, read content, upload files |
-| `google-sheets` | `spreadsheets.readonly` or `spreadsheets` | Read and edit spreadsheets |
-| `google-docs` | `documents.readonly` or `documents` | Read and edit documents |
+| `google-gmail` | `gmail.modify`, `gmail.compose`, `gmail.readonly`, `gmail.send`, `gmail.labels` | Read messages, search, send emails, manage labels |
+| `google-calendar` | `calendar.events.readonly`, `calendar.events`, `calendar.readonly` | Read events, create/modify events |
+| `google-drive` | `drive.readonly`, `drive.file`, `drive` | List files, read content, upload files |
+| `google-sheets` | `spreadsheets.readonly`, `spreadsheets` | Read and edit spreadsheets |
+| `google-docs` | `documents.readonly`, `documents` | Read and edit documents |
+| `google-contacts` | `contacts.readonly`, `contacts` | Read and manage contacts |
 
 ## Vault API Usage
 

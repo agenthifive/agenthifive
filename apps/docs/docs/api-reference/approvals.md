@@ -16,7 +16,7 @@ When a Model B execution request triggers step-up approval (based on the policy'
 3. The execution gateway returns `202` with an `approvalRequestId`
 4. The approval appears in the dashboard for workspace members to review
 5. A reviewer approves or denies the request
-6. If approved, the original HTTP request is executed and the result is returned
+6. If approved, the agent re-submits the original request via `POST /v1/vault/execute` with the `approvalId` to execute it
 
 Approval requests expire after **5 minutes**. Expired requests cannot be approved.
 
@@ -38,7 +38,7 @@ Custom policy rules can override these modes. A rule action of `require_approval
 |---|---|---|
 | `GET` | `/v1/approvals` | List approval requests |
 | `GET` | `/v1/approvals/:id` | Get approval details |
-| `POST` | `/v1/approvals/:id/approve` | Approve and execute |
+| `POST` | `/v1/approvals/:id/approve` | Approve request |
 | `POST` | `/v1/approvals/:id/deny` | Deny the request |
 
 ## List Approval Requests
@@ -77,7 +77,7 @@ Returns all approval requests for the current workspace, including pending, appr
 }
 ```
 
-**Approval statuses**: `pending`, `approved`, `denied`, `expired`
+**Approval statuses**: `pending`, `approved`, `denied`, `expired`, `consumed`
 
 The `requestDetails` object contains the original Model B request parameters (method, URL, headers, body) plus provider-specific metadata when available:
 
@@ -99,23 +99,21 @@ Returns full details for a single approval request.
 POST /v1/approvals/:id/approve
 ```
 
-Approves a pending approval request. The original Model B request is executed immediately and the provider response is returned.
+Approves a pending approval request. This does **not** execute the original request. Instead, the agent must re-submit the request via `POST /v1/vault/execute` with the `approvalId` to bypass the guard and execute it.
 
-**Response (200)** -- same shape as a Model B execution response:
+**Response (200)**:
 
 ```json
 {
-  "model": "B",
-  "status": 200,
-  "headers": { "content-type": "application/json" },
-  "body": { ... },
+  "approved": true,
+  "approvalRequestId": "uuid",
   "auditId": "uuid"
 }
 ```
 
 | Status | Description |
 |---|---|
-| `200` | Approved and executed successfully |
+| `200` | Approved successfully (agent must re-submit via `POST /v1/vault/execute` with `approvalId`) |
 | `404` | Approval request not found |
 | `409` | Already approved, denied, or connection revoked |
 | `410` | Approval request has expired |

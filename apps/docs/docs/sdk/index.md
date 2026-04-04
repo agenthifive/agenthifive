@@ -38,10 +38,11 @@ The SDK requires **Node.js 18+** (uses the built-in `fetch` API) and **TypeScrip
 import { AgentHiFiveClient } from "@agenthifive/sdk";
 
 // First-time bootstrap (run once with the bootstrap secret from the dashboard)
-const { client, agentId } = await AgentHiFiveClient.bootstrap({
-  baseUrl: "https://api.agenthifive.com",
-  bootstrapSecret: "ah5b_...",
-});
+const { agentId, name, status, workspaceId } = await AgentHiFiveClient.bootstrap(
+  "https://api.agenthifive.com",
+  "ah5b_...",
+  publicKeyJwk,
+);
 
 // After bootstrap, create the client with the persisted private key
 const client = new AgentHiFiveClient({

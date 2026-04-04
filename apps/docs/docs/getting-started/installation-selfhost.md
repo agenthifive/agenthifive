@@ -42,7 +42,7 @@ After it completes, open a new terminal so nvm is loaded in your shell.
 ## Step 3: Configure Environment Variables
 
 ```bash
-cp .env.example .env
+cp core/.env.example .env
 ```
 
 Open `.env` and set the values below. At minimum you need `ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` — everything else has working defaults for local development.
@@ -87,7 +87,12 @@ make dev
 
 This starts:
 - **Web dashboard** on [http://localhost:3000](http://localhost:3000)
-- **API server** on [http://localhost:4000](http://localhost:4000)
+- **Admin dashboard** on [http://localhost:3002](http://localhost:3002)
+- **Docusaurus docs** on [http://localhost:3001](http://localhost:3001)
+
+:::note
+`make dev` runs all dev servers **except** the core API package (`@agenthifive/api`). To start the API server separately, use `make dev-api` (Fastify on port 4000).
+:::
 
 Open your browser to [http://localhost:3000](http://localhost:3000) and create your first account.
 
@@ -100,7 +105,7 @@ For headless servers or long-running sessions, use `make dev-ul` to run in the b
 | Command | Description |
 |---------|-------------|
 | `make init` | First-time setup: install deps, build packages, start DB, migrate |
-| `make dev` | Start web (`:3000`) + API (`:4000`) dev servers |
+| `make dev` | Start all dev servers except the core API (web, admin, docs) |
 | `make dev-ul` | Start dev servers in background (survives SSH disconnect) |
 | `make build` | Build all packages and apps |
 | `make test` | Run full test suite |
@@ -134,7 +139,7 @@ cd AgentH5
 ## Step 2: Configure Environment Variables
 
 ```bash
-cp .env.example .env
+cp core/.env.example .env
 ```
 
 Edit `.env` and set production values. See the environment variable table in the Node.js tab for the full list. At minimum, generate real secrets:
@@ -166,6 +171,10 @@ WEB_JWKS_URL=http://api:4000/.well-known/jwks.json
 :::
 
 ## Step 3: Create docker-compose.prod.yml
+
+:::tip
+The repository ships its own `docker-compose.prod.yml` in the repo root. You should use that file as your starting point instead of creating one from scratch. The example below is shown for reference.
+:::
 
 Create a `docker-compose.prod.yml` in the repo root:
 

@@ -15,7 +15,7 @@ Connections represent authenticated links to third-party providers (Google, Micr
 |---|---|---|
 | `GET` | `/v1/connections` | List active connections |
 | `POST` | `/v1/connections/start` | Start OAuth flow |
-| `POST` | `/v1/connections/telegram` | Connect a Telegram bot |
+| `POST` | `/v1/connections/bot-token` | Connect a bot token service (Telegram, Slack) |
 | `GET` | `/v1/connections/callback` | OAuth callback (no auth required) |
 | `POST` | `/v1/connections/:id/revoke` | Revoke a connection |
 | `POST` | `/v1/connections/:id/reauth` | Start reauthentication flow |
@@ -107,18 +107,19 @@ Initiates an OAuth 2.0 authorization code flow with PKCE. Returns a URL to redir
 
 Redirect the user's browser to `authorizationUrl`. After authorization, the provider redirects to the callback endpoint.
 
-## Connect Telegram Bot
+## Connect Bot Token Service
 
 ```
-POST /v1/connections/telegram
+POST /v1/connections/bot-token
 ```
 
-Validates a Telegram bot token via the `getMe` API and stores it encrypted.
+Generic endpoint for all bot token services (Telegram, Slack, etc.). Validates the token via the provider's API and stores it encrypted.
 
 **Request body**:
 
 ```json
 {
+  "service": "telegram",
   "botToken": "123456789:ABCdefGhIjKlMnOpQrStUvWxYz",
   "label": "Support Bot"
 }
@@ -126,8 +127,9 @@ Validates a Telegram bot token via the `getMe` API and stores it encrypted.
 
 | Field | Required | Description |
 |---|---|---|
-| `botToken` | Yes | Bot token from BotFather |
-| `label` | No | Display label (defaults to `Telegram @username`) |
+| `service` | Yes | Service ID from the catalog (e.g., `telegram`, `slack`) |
+| `botToken` | Yes | Bot token from the provider (e.g., BotFather for Telegram, Slack app settings for Slack) |
+| `label` | No | Display label (defaults to provider-specific name, e.g., `Telegram @username`) |
 
 :::tip
 To restrict which chats the bot can interact with, configure **provider constraints** on the policy via [`PUT /v1/policies/:id/provider-constraints`](./agents-policies.md#update-provider-constraints).

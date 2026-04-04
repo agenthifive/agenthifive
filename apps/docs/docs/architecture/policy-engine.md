@@ -30,7 +30,7 @@ Request arrives
   |
   v
 [2] REQUEST RULES -- ordered, first match wins
-  |  Actions: allow | deny | require_approval
+  |  Actions: allow | deny | require_approval | redact
   v
 [3] Execute provider API call (Model B flow)
   |
@@ -53,9 +53,13 @@ interface RequestRule {
   match: {
     methods?: string[];       // HTTP methods. Empty = match all
     urlPattern?: string;      // Regex against URL path. Omitted = match all
+    queryPattern?: string;    // Regex against query string. Omitted = match all
     body?: BodyCondition[];   // JSON body conditions. All must match (AND)
+    pii?: PiiMatchConfig;     // PII detection in request body fields (without mutating payload)
   };
-  action: "allow" | "deny" | "require_approval";
+  action: "allow" | "deny" | "require_approval" | "redact";
+  /** PII redaction config -- only used when action is "redact". */
+  redactConfig?: RedactConfig;
 }
 
 interface BodyCondition {
@@ -75,7 +79,7 @@ function evaluateRequestRules(
   method: string,
   urlPath: string,
   body: unknown,
-): "allow" | "deny" | "require_approval" | null {
+): "allow" | "deny" | "require_approval" | "redact" | null {
   for (const rule of rules) {
     if (rule.methodSet && !rule.methodSet.has(method)) continue;
     if (rule.urlRegex && !rule.urlRegex.test(urlPath)) continue;
@@ -186,16 +190,21 @@ interface ResponseRule {
 
 ### PII Redaction
 
-Redaction patterns are applied to all string values in the response after field filtering. Supported built-in patterns:
+Redaction patterns are applied to all string values in the response after field filtering. The engine supports 40+ built-in recognizer types organized by category:
 
-| Pattern | Matches |
-|---------|---------|
-| `email` | Email addresses |
-| `phone` | Phone numbers (US format) |
-| `ssn` | Social Security Numbers |
-| `credit_card` | Credit card numbers |
-| `ip_address` | IPv4 addresses |
-| `custom` | User-defined regex |
+| Category | Patterns |
+|----------|----------|
+| **Groups** | `all_pii`, `financial`, `identity`, `contact` (each expands to multiple recognizers) |
+| **Generic** | `email`, `phone`, `credit_card`, `iban`, `ip_address`, `url`, `crypto_wallet`, `date_of_birth`, `mac_address`, `secret_code` |
+| **US** | `us_ssn`, `us_itin`, `us_passport`, `us_driver_license`, `us_bank_routing`, `us_npi` |
+| **UK** | `uk_nhs`, `uk_nino` |
+| **Italy** | `it_fiscal_code`, `it_vat`, `it_passport`, `it_identity_card`, `it_driver_license` |
+| **India** | `in_aadhaar`, `in_pan` |
+| **Spain** | `es_nif`, `es_nie` |
+| **Australia** | `au_tfn`, `au_abn` |
+| **Other countries** | `pl_pesel`, `fi_pic`, `th_tnin`, `kr_rrn`, `sg_fin` |
+| **Legacy** | `ssn` (alias for `us_ssn`) |
+| **Custom** | `custom` (user-defined regex via `pattern` field) |
 
 All patterns for a rule are combined into a single alternation regex at compile time for a single-pass replacement:
 
@@ -268,15 +277,20 @@ export const RequestRuleSchema = z.object({
   match: z.object({
     methods: z.array(z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"])).optional(),
     urlPattern: z.string().optional(),
+    queryPattern: z.string().optional(),
     body: z.array(BodyConditionSchema).optional(),
+    pii: PiiMatchConfigSchema.optional(),
   }),
-  action: z.enum(["allow", "deny", "require_approval"]),
+  action: z.enum(["allow", "deny", "require_approval", "redact"]),
+  /** PII redaction config -- only used when action is "redact". */
+  redactConfig: RedactConfigSchema.optional(),
 });
 
 export const ResponseRuleSchema = z.object({
   label: z.string().optional(),
   match: z.object({
     urlPattern: z.string().optional(),
+    queryPattern: z.string().optional(),
     methods: z.array(z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"])).optional(),
   }),
   filter: z.object({
@@ -289,6 +303,7 @@ export const ResponseRuleSchema = z.object({
 export const PolicyRulesSchema = z.object({
   request: z.array(RequestRuleSchema).default([]),
   response: z.array(ResponseRuleSchema).default([]),
+  fieldStepUpEnabled: z.boolean().optional(),
 });
 ```
 

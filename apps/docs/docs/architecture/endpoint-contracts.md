@@ -23,11 +23,16 @@ export type WorkspaceId = Brand<string, "WorkspaceId">;
 export type SessionId = Brand<string, "SessionId">;
 export type ConnectionId = Brand<string, "ConnectionId">;
 export type AgentId = Brand<string, "AgentId">;
+export type PolicyId = Brand<string, "PolicyId">;
+export type AuditId = Brand<string, "AuditId">;
 
 export const WorkspaceRoleSchema = z.enum([
   "owner", "admin", "member", "viewer", "agent"
 ]);
 export type WorkspaceRole = z.infer<typeof WorkspaceRoleSchema>;
+
+export const PlatformRoleSchema = z.enum(["user", "superadmin"]);
+export type PlatformRole = z.infer<typeof PlatformRoleSchema>;
 
 export const ScopeSchema = z.string().min(1);
 export type Scope = z.infer<typeof ScopeSchema>;
@@ -175,6 +180,8 @@ interface EncryptedEnvelopeV1 {
 ```typescript title="packages/contracts/src/oauth.ts"
 export const OAuthProviderSchema = z.enum([
   "google", "microsoft", "telegram", "github", "slack",
+  "anthropic", "openai", "gemini", "openrouter",
+  "notion", "trello", "jira",
 ]);
 export type OAuthProvider = z.infer<typeof OAuthProviderSchema>;
 
@@ -207,4 +214,11 @@ interface OAuthConnector {
 | Microsoft | Yes | Yes | Azure AD v2.0 |
 | Telegram | No | No | Bot API token, not OAuth |
 | GitHub | Yes | Yes | OAuth Apps or GitHub Apps |
-| Slack | Yes | Yes | Phase 2 |
+| Slack | Yes | Yes | Slack OAuth v2 |
+| Anthropic | No | No | API key based |
+| OpenAI | No | No | API key based |
+| Gemini | No | No | API key based |
+| OpenRouter | No | No | API key based |
+| Notion | Yes | No | OAuth 2.0 |
+| Trello | Yes | No | OAuth 1.0a |
+| Jira | Yes | Yes | Atlassian OAuth 2.0 (3LO) |

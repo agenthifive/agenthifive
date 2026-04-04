@@ -25,7 +25,7 @@ The primary authentication flow exchanges a Better Auth session cookie for a sho
 POST /api/auth/token
 ```
 
-This endpoint lives on the **web app** (not the API server). It reads the session cookie, validates the session, and returns a signed JWT.
+This endpoint lives on the **Fastify API server**. It reads the session cookie, validates the session, and returns a signed JWT.
 
 **Request**: No body required. The session cookie is sent automatically by the browser.
 
@@ -33,17 +33,15 @@ This endpoint lives on the **web app** (not the API server). It reads the sessio
 
 ```json
 {
-  "accessToken": "eyJhbGciOiJSUzI1NiIs...",
-  "tokenType": "Bearer",
-  "expiresIn": 300
+  "token": "eyJhbGciOiJSUzI1NiIs...",
+  "expiresAt": "2025-06-01T00:05:00Z"
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `accessToken` | `string` | Signed JWT for API access |
-| `tokenType` | `string` | Always `"Bearer"` |
-| `expiresIn` | `number` | TTL in seconds (default: 300 = 5 minutes) |
+| `token` | `string` | Signed JWT for API access |
+| `expiresAt` | `string` | ISO 8601 expiration timestamp (5 minutes from issuance) |
 
 ### JWT Claims
 
@@ -66,19 +64,19 @@ interface ApiAccessClaims {
 
 ### JWKS Endpoint
 
-The API server verifies JWTs using the public key served from the web app:
+The API server verifies JWTs using the public key served from itself:
 
 ```
 GET /.well-known/jwks.json
 ```
 
-This endpoint is hosted on the **web app** origin. The API server fetches and caches this key set using `jose`'s `createRemoteJWKSet`.
+This endpoint is hosted on the **Fastify API server**. The API server fetches and caches this key set using `jose`'s `createRemoteJWKSet`.
 
 ### Example: Using a Bearer JWT
 
 ```bash
 # 1. Exchange session for JWT (browser sends cookie automatically)
-TOKEN=$(curl -s -b cookies.txt http://localhost:3000/api/auth/token | jq -r '.accessToken')
+TOKEN=$(curl -s -b cookies.txt http://localhost:3000/api/auth/token | jq -r '.token')
 
 # 2. Call the API with the JWT
 curl -H "Authorization: Bearer $TOKEN" \

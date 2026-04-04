@@ -169,6 +169,49 @@ const denyResult = await client.denyAction(approvals[0].id);
 | `listPolicies()` | `PolicySummary[]` | List policies in the current workspace. |
 | `createPolicy(options)` | `PolicySummary` | Create a policy binding between an agent and a connection. |
 
+### Capability Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `listServices()` | `ServiceInfo[]` | List all available services and their action templates. Discover what capabilities AgentHiFive supports. |
+| `getMyCapabilities()` | `MyCapabilities` | Get the calling agent's current capability status. Returns active connections, pending requests, and available actions. |
+| `requestCapability(actionTemplateId, reason)` | `CapabilityRequest` | Request access to a capability. Creates a permission request for the workspace owner. Returns 409 if a request already exists or access is already granted. |
+
+#### Discover Available Services
+
+```typescript
+const services = await client.listServices();
+
+for (const service of services) {
+  console.log(`${service.name} (${service.provider})`);
+  for (const action of service.actions) {
+    console.log(`  - ${action.label}: ${action.description}`);
+  }
+}
+```
+
+#### Check Agent Capabilities
+
+```typescript
+const caps = await client.getMyCapabilities();
+
+console.log("Active connections:", caps.activeConnections.length);
+console.log("Pending requests:", caps.pendingRequests.length);
+console.log("Available actions:", caps.availableActions.length);
+```
+
+#### Request a Capability
+
+```typescript
+const request = await client.requestCapability(
+  "action-template-id",
+  "Need Gmail access to send weekly reports",
+);
+
+console.log("Request ID:", request.id);
+console.log("Created at:", request.createdAt);
+```
+
 ### Audit Methods
 
 | Method | Returns | Description |

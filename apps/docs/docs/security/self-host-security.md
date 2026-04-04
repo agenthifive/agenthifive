@@ -41,7 +41,7 @@ The key is validated at encryption and decryption time -- it must be exactly 32 
 2. Update the `ENCRYPTION_KEY` environment variable
 3. Restart the API service
 
-A background job automatically re-encrypts existing records with the new key. During re-encryption, records encrypted with the old key are still decryptable because the envelope format supports version tracking.
+Re-encryption of existing records is a **manual** process -- run the `rotate-data-key.sh` script after updating the key. There is no automatic background re-encryption job.
 
 ### Key initialization modes
 
@@ -186,10 +186,10 @@ This prevents agents from using the vault to probe your internal network.
 If the API needs to reach internal services (e.g., a self-hosted Notion or GitLab instance), set:
 
 ```
-SSRF_ALLOW_PRIVATE=true
+SSRF_ALLOWLIST_HOSTS=notion.internal,gitlab.internal
 ```
 
-Use this with caution. Prefer an explicit allowlist of internal hostnames when possible.
+Set `SSRF_ALLOWLIST_HOSTS` to a comma-separated list of hostnames that should bypass private-IP SSRF checks. This is intended for testing or environments where agents need to reach internal services. Never set this in production unless strictly necessary.
 
 ---
 

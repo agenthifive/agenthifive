@@ -7,16 +7,20 @@ description: AES-256-GCM envelope encryption, key providers (KMS, Vault Transit,
 
 # Encryption
 
-AgentHiFive encrypts all provider OAuth tokens at rest using **AES-256-GCM** with **envelope encryption**. This page covers the encryption architecture, supported key providers, and rotation strategy.
+AgentHiFive encrypts all provider OAuth tokens at rest using **AES-256-GCM**. When running in Azure Key Vault mode (`azure-kv`), envelope encryption adds a second layer of key protection. This page covers the encryption architecture, supported key providers, and rotation strategy.
 
 ## Envelope Encryption
 
+:::note Azure Key Vault Only
+Envelope encryption (DEK/KEK separation) is only implemented for the `azure-kv` key mode. In the default `env` mode, a single encryption key from the `ENCRYPTION_KEY` environment variable is used directly -- there is no DEK/KEK separation.
+:::
+
 Envelope encryption uses two layers of keys:
 
-- **Data Encryption Key (DEK)** -- encrypts the actual data (provider tokens). Generated per workspace.
-- **Key Encryption Key (KEK)** -- encrypts the DEKs. Managed by an external KMS or key provider. Never exposed to the application.
+- **Data Encryption Key (DEK)** -- encrypts the actual data (provider tokens). A single DEK is unwrapped from Azure Key Vault at startup.
+- **Key Encryption Key (KEK)** -- encrypts (wraps) the DEK. Managed by Azure Key Vault. Never exposed to the application.
 
-This separation means the application only ever sees the DEK in memory during encrypt/decrypt operations. The KEK never leaves the KMS boundary.
+This separation means the application only ever sees the DEK in memory during encrypt/decrypt operations. The KEK never leaves the Key Vault boundary.
 
 ### Encrypted Payload Format
 
@@ -34,8 +38,8 @@ interface EncryptedPayload {
 
 The `v` and `alg` fields enable future migration to different algorithms (including post-quantum) without changing the storage schema.
 
-:::info Planned: Full Envelope Encryption
-The current implementation uses a single encryption key per workspace. Full envelope encryption with separate DEKs wrapped by a KEK (via AWS KMS, Vault Transit, or age) is planned for production deployment. The `v` field will increment when this layer is added.
+:::info Key Modes
+In `env` mode (default), the `ENCRYPTION_KEY` environment variable is used directly as the encryption key. In `azure-kv` mode, a wrapped DEK is unwrapped from Azure Key Vault at startup using a KEK, providing true envelope encryption. See [Self-Host Security](./self-host-security.md#key-initialization-modes) for configuration details.
 :::
 
 ## Key Providers
@@ -85,27 +89,17 @@ With age, key rotation is a manual process: generate a new key, re-encrypt all D
 | DEK (workspace key) | Every 90 days | Scheduled |
 | Emergency rotation | Immediate | Key compromise suspected |
 
-### Background Rewrap
+### Manual Re-encryption
 
-A background job periodically re-encrypts tokens with the current key version to reduce the exposure window:
+:::warning No Automatic Background Rewrap
+There is no automatic background re-encryption job. Key rotation and re-encryption of existing records is a manual process using the `rotate-data-key.sh` script.
+:::
 
-```typescript
-async function rewrapOldTokens(olderThanDays = 90) {
-  const staleTokens = await db.query.oauthTokenSets.findMany({
-    where: lt(oauthTokenSets.lastRotatedAt, subDays(new Date(), olderThanDays)),
-  });
+To re-encrypt tokens after rotating the encryption key:
 
-  for (const token of staleTokens) {
-    const plaintext = await decrypt(token);
-    const newEnvelope = await encrypt(plaintext);
-    await db.update(oauthTokenSets).set({
-      ciphertext: newEnvelope.ciphertext,
-      encryptionKeyVersion: newEnvelope.version,
-      lastRotatedAt: new Date(),
-    }).where(eq(oauthTokenSets.id, token.id));
-  }
-}
-```
+1. Generate a new key and update `ENCRYPTION_KEY` (or rotate the KEK in Azure Key Vault).
+2. Run the `rotate-data-key.sh` script to re-encrypt all stored tokens with the new key.
+3. Restart the API service.
 
 ### Emergency Rotation Procedure
 
