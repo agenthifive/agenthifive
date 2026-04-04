@@ -50,7 +50,7 @@ See the [Authentication](./authentication.md) page for the full token exchange f
 | [Authentication](./authentication.md) | `/api/auth/*` | Token exchange, JWKS, PATs |
 | [Connections](./connections.md) | `/v1/connections` | OAuth connection lifecycle -- initiation, callback, revocation, reauth |
 | [Agents & Policies](./agents-policies.md) | `/v1/agents`, `/v1/policies` | Agent registration, policy bindings, allowlists, rate limits, time windows, rules |
-| [Agent Authentication](./agent-auth.md) | `/v1/agents/enroll`, `/v1/agents/token` | Agent onboarding -- enrollment, key rotation, token exchange (unauthenticated) |
+| [Agent Authentication](./agent-auth.md) | `/v1/agents/bootstrap`, `/v1/agents/token` | Agent onboarding -- enrollment, key rotation, token exchange (unauthenticated) |
 | [Execution](./execution.md) | `/v1/vault`, `/v1/credentials` | Execution gateway (Model A token vending, Model B brokered proxy), credential resolution |
 | [Approvals](./approvals.md) | `/v1/approvals` | Step-up approval workflow for sensitive actions |
 | [Audit](./audit.md) | `/v1/audit` | Audit event querying, filtering, and export |

@@ -61,9 +61,15 @@ Returns the full AgentHiFive service catalog with available action templates per
         }
       ]
     }
-  ]
+  ],
+  "oauthStatus": {
+    "google": { "available": true, "source": "platform" },
+    "microsoft": { "available": false, "source": null }
+  }
 }
 ```
+
+The `oauthStatus` object indicates whether OAuth credentials are configured for each provider that requires them. `available` is `true` if credentials exist (from platform defaults or workspace-level custom apps). `source` indicates the credential origin (`null` if unavailable).
 
 ## Get My Capabilities
 
@@ -71,7 +77,7 @@ Returns the full AgentHiFive service catalog with available action templates per
 GET /v1/capabilities/me
 ```
 
-Returns the calling agent's current capability status. **Requires an agent API key** (`X-API-Key: ah5_...`) — user JWTs receive a 403.
+Returns the calling agent's current capability status. **Requires an agent access token** (`Authorization: Bearer ah5t_...`) — user JWTs receive a 403.
 
 **Response**:
 
@@ -81,6 +87,11 @@ Returns the calling agent's current capability status. **Requires an agent API k
     {
       "connectionId": "uuid-or-null",
       "service": "google-gmail",
+      "provider": "google",
+      "status": "healthy",
+      "credentialType": "oauth",
+      "category": "data",
+      "displayName": "Gmail",
       "label": "Work Gmail",
       "actionTemplateId": "gmail-read"
     }
@@ -107,7 +118,7 @@ Returns the calling agent's current capability status. **Requires an agent API k
 
 | Section | Description |
 |---|---|
-| `activeConnections` | Connections with policies granted to this agent. For **singleton services** (Telegram, Anthropic), `connectionId` is `null` — use `service` name with `vault_execute` instead. |
+| `activeConnections` | Connections with policies granted to this agent. Includes `provider`, `status`, `credentialType`, `category`, and `displayName` from the service catalog. For **singleton services** (Telegram, Anthropic), `connectionId` is `null` — use `service` name with `vault_execute` instead. |
 | `pendingRequests` | This agent's unresolved permission requests (status = `pending` only). Approved/denied requests are excluded. |
 | `availableActions` | Action templates not covered by any active connection or pending request — actions the agent can still request. |
 

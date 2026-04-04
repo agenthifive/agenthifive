@@ -14,7 +14,7 @@ AgentHiFive uses a pnpm workspace monorepo managed by Turborepo. Infrastructure 
 ```
 agenthifive/
 ├── package.json              # Root scripts (turbo build/dev/lint/typecheck/test)
-├── pnpm-workspace.yaml       # Workspace: apps/* + packages/*
+├── pnpm-workspace.yaml       # Workspace: core/apps/*, core/packages/*, apps/*
 ├── turbo.json                # Task pipeline and caching
 ├── tsconfig.base.json        # Shared compiler options
 ├── Makefile                  # Dev environment orchestration
@@ -38,14 +38,37 @@ agenthifive/
 │   ├── api/                  # Fastify -- business logic, OAuth, policy engine
 │   │   └── src/
 │   │       ├── server.ts                 # Fastify entry point
-│   │       ├── plugins/                  # Fastify plugins
-│   │       │   └── auth-jwt/             #   JWT verification via JWKS
-│   │       ├── modules/                  # Feature modules (routes + service per module)
-│   │       │   ├── oauth/                #   OAuth flows (auth-code, device)
-│   │       │   ├── connections/          #   Provider connection management
-│   │       │   ├── policies/             #   Policy engine (Model B)
-│   │       │   ├── proxy/                #   Model B brokered proxy
-│   │       │   └── audit/                #   Audit logging
+│   │       ├── plugins/                  # Fastify plugins (jwt-auth, etc.)
+│   │       ├── routes/                   # Flat route files (one per resource)
+│   │       │   ├── workspaces.ts         #   Workspace management
+│   │       │   ├── connections.ts        #   Provider connection management
+│   │       │   ├── agents.ts             #   Agent registration
+│   │       │   ├── policies.ts           #   Policy CRUD
+│   │       │   ├── vault.ts              #   Model A/B execution
+│   │       │   ├── approvals.ts          #   Human-in-the-loop approvals
+│   │       │   ├── audit.ts              #   Audit log queries
+│   │       │   ├── activity.ts           #   Activity feed
+│   │       │   ├── templates.ts          #   Policy templates
+│   │       │   ├── dashboard.ts          #   Dashboard aggregations
+│   │       │   ├── tokens.ts             #   Token management
+│   │       │   ├── credentials.ts        #   Credential management
+│   │       │   ├── capabilities.ts       #   Provider capabilities
+│   │       │   ├── notifications.ts      #   Notification management
+│   │       │   ├── notification-channels.ts  # Notification channels
+│   │       │   ├── agent-auth.ts         #   Agent authentication
+│   │       │   ├── user-auth.ts          #   User authentication (Better Auth)
+│   │       │   ├── user-token.ts         #   User token management
+│   │       │   ├── workspace-oauth-apps.ts   # Workspace OAuth apps
+│   │       │   ├── agent-permission-requests.ts  # Agent permission requests
+│   │       │   └── quick-actions.ts      #   Quick actions
+│   │       ├── services/                 # Service logic (flat files)
+│   │       │   ├── policy-engine.ts      #   Rule compilation and evaluation
+│   │       │   ├── audit.ts              #   Async audit logging
+│   │       │   ├── encryption-key.ts     #   Encryption key management
+│   │       │   ├── pg-listeners.ts       #   PostgreSQL LISTEN/NOTIFY
+│   │       │   ├── notifications.ts      #   Notification dispatch
+│   │       │   ├── email.ts              #   Email service
+│   │       │   └── anomaly-detector.ts   #   Anomaly detection
 │   │       └── db/
 │   │           ├── schema/               #   Drizzle table definitions
 │   │           ├── migrations/           #   Generated migrations
@@ -57,10 +80,15 @@ agenthifive/
 ├── packages/
 │   ├── contracts/            # Shared types and Zod schemas
 │   │   └── src/              #   common.ts, auth.ts, oauth.ts, policy.ts
-│   ├── security/             # JWT and encryption interfaces
-│   │   └── src/              #   jwt.ts, crypto.ts
-│   └── oauth-connectors/     # Provider OAuth abstraction
-│       └── src/              #   types.ts, capabilities.ts, providers/
+│   ├── security/             # AES-256-GCM encryption utilities
+│   │   └── src/              #   crypto.ts
+│   ├── sdk/                  # Official TypeScript SDK
+│   ├── oauth-connectors/     # Provider OAuth abstraction
+│   │   └── src/              #   types.ts, capabilities.ts, providers/
+│   ├── openclaw/             # OpenClaw Gateway plugin
+│   ├── agenthifive-mcp/      # MCP server (stdio transport)
+│   ├── openclaw-setup/       # OpenClaw setup utilities
+│   └── integration-sdk/      # Integration SDK for third parties
 │
 ├── infra/
 │   └── nginx/
@@ -78,7 +106,7 @@ agenthifive/
 
 | Directory | Convention |
 |-----------|-----------|
-| `apps/api/src/modules/` | **Module-per-feature** -- each module owns its routes, service logic, and types |
+| `apps/api/src/routes/` + `apps/api/src/services/` | **Flat file structure** -- one route file per resource in `routes/`, shared service logic in `services/` |
 | `apps/web/src/app/` | **Next.js App Router** -- route groups `(auth)` and `(dashboard)` separate public and authenticated pages |
 | `packages/*/src/` | Flat source with `index.ts` barrel export. No runtime HTTP logic in packages |
 | `infra/` | Infrastructure config files only (Nginx, future K8s manifests) |
@@ -90,8 +118,9 @@ agenthifive/
 
 ```yaml title="pnpm-workspace.yaml"
 packages:
+  - "core/apps/*"
+  - "core/packages/*"
   - "apps/*"
-  - "packages/*"
 ```
 
 All apps and packages are linked via pnpm workspaces. Internal dependencies use `workspace:*` protocol.
@@ -100,25 +129,27 @@ All apps and packages are linked via pnpm workspaces. Internal dependencies use 
 
 ```json title="turbo.json"
 {
+  "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"]
+      "outputs": ["dist/**", ".next/**", "build/**"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
     "typecheck": {
-      "dependsOn": ["^typecheck"],
-      "outputs": []
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "env": ["DATABASE_URL"]
     }
   }
 }

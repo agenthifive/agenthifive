@@ -182,7 +182,7 @@ Skills are CLI tools that the agent invokes via `exec`. Each skill manages its o
 | Canvas | Local display | None | Write |
 
 :::warning Credential Gap
-Skills operate **outside** OpenClaw's credential resolver system. CLI tools like `gog` and `himalaya` manage their own OAuth tokens internally. This represents a separate credential surface that requires interception at the skill execution boundary. See the [Credential Architecture](./credential-architecture.md) page for details.
+Skills operate **outside** OpenClaw's credential resolver system. CLI tools like `gog` and `himalaya` manage their own OAuth tokens internally. This represents a separate credential surface that requires interception at the skill execution boundary.
 :::
 
 ---

@@ -135,7 +135,21 @@ The bootstrap secret expires in 1 hour (configurable via `BOOTSTRAP_SECRET_TTL_H
 POST /v1/agents/:id/disable
 ```
 
-Disables the agent immediately. All outstanding access tokens are deleted and new token exchanges are rejected. Returns the updated agent.
+Disables the agent immediately. All outstanding access tokens are deleted and new token exchanges are rejected.
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "tokensRevoked": 3
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `success` | `boolean` | Always `true` on success |
+| `tokensRevoked` | `number` | Number of access tokens that were revoked |
 
 ### Enable Agent
 
@@ -143,7 +157,21 @@ Disables the agent immediately. All outstanding access tokens are deleted and ne
 POST /v1/agents/:id/enable
 ```
 
-Re-enables a disabled agent. If the agent has a public key on file, the status returns to `active`. If not (e.g., never enrolled), the status returns to `created`. Returns the updated agent.
+Re-enables a disabled agent. If the agent has a public key on file, the status returns to `active`. If not (e.g., never enrolled), the status returns to `created`.
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "status": "active"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `success` | `boolean` | Always `true` on success |
+| `status` | `string` | New agent status: `"created"` or `"active"` |
 
 ---
 

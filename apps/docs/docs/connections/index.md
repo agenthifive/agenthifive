@@ -28,17 +28,18 @@ Connections link your external service accounts to AgentHiFive so that AI agents
 | [Google Drive](./google) | Google | Read, search, and manage files |
 | [Google Sheets](./google) | Google | Read and edit spreadsheets |
 | [Google Docs](./google) | Google | Read and edit documents |
+| [Google Contacts](./google) | Google | Read and manage contacts |
 | [Outlook Mail](./microsoft) | Microsoft | Read and send emails |
 | [Outlook Calendar](./microsoft) | Microsoft | Read and create calendar events |
 | [Outlook Contacts](./microsoft) | Microsoft | Read and manage contacts |
 | [OneDrive](./microsoft) | Microsoft | Read, upload, and manage files |
 | [Microsoft Teams](./microsoft) | Microsoft | Read and send chat/channel messages |
-| [Notion](./notion) | Notion | Read, search, and manage pages, databases, and blocks |
 
-### Project Management (API Key)
+### Project Management & Data (API Key)
 
 | Service | Provider | What Agents Can Do |
 |---------|----------|-------------------|
+| [Notion](./notion) | Notion | Read, search, and manage pages, databases, and blocks |
 | [Trello](./trello) | Trello | Read boards/lists/cards, create and move cards |
 | [Jira](./jira) | Jira Cloud | Read and create issues, manage sprints and projects |
 

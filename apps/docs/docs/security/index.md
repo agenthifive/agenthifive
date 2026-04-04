@@ -25,11 +25,13 @@ AgentHiFive uses a layered authentication model:
 |-------|-----------|---------|
 | **User auth** | Better Auth (passkeys, OAuth) | Human users accessing the web dashboard. |
 | **Session tokens** | JWTs signed with RS256 via JWKS | Stateless session validation across services. JWTs have a 5-minute TTL. |
-| **Agent auth** | API keys (`ah5_...` prefix) | AI agents calling the execution gateway. Scoped to a workspace. |
+| **Agent auth** | Agent access tokens (`ah5t_...`) and Personal Access Tokens (`ah5p_...`) | AI agents and API consumers calling the execution gateway. Scoped to a workspace. |
 | **Provider auth** | OAuth 2.0 access/refresh tokens | Delegated access to third-party provider APIs (Google, Microsoft, Telegram). |
 
 :::info JWT Verification
-The API service verifies JWTs by fetching the public key set (JWKS) from the web service. Keys are cached and rotated on a 90-day schedule. Multiple key IDs (`kid`) are supported simultaneously during rotation.
+The API service verifies JWTs by fetching the public key set (JWKS) from the web service. Verification checks the signature algorithm (RS256), the **issuer** (must match `WEB_URL`), and the **audience** (must be `"api"`). Keys are cached and rotated on a 90-day schedule. Multiple key IDs (`kid`) are supported simultaneously during rotation.
+
+JWT claims include: `sub` (user ID), `wid` (workspace ID), `roles` (array), `scp` (scopes array), `sid` (session ID), and `platformRole` (`"user"` or `"superadmin"`).
 :::
 
 ## Key Management Overview

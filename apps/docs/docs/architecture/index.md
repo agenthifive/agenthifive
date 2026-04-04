@@ -13,11 +13,18 @@ AgentHiFive is an authority delegation platform for AI agents. It uses a **monor
 
 | Component | Technology | Responsibility |
 |-----------|-----------|----------------|
-| **apps/web** | Next.js 16 | User dashboard, Better Auth (email/password, social OAuth, passkeys), JWKS endpoint, token exchange |
-| **apps/api** | Fastify 5 | Business APIs, provider OAuth (oauth4webapi), policy engine, brokered proxy (Model B), audit logging |
+| **apps/web** | Next.js 16 | User dashboard, Better Auth (email/password, social OAuth, passkeys) |
+| **apps/api** | Fastify 5 | Business APIs, JWKS endpoint, token exchange, provider OAuth (oauth4webapi), policy engine, brokered proxy (Model B), audit logging |
+| **apps/cli** | TypeScript | CLI tool for workspace and agent management |
+| **apps/docs** | Docusaurus 3.x | Documentation site |
 | **packages/contracts** | TypeScript + Zod | Shared types, Zod schemas, JWT claim interfaces |
-| **packages/security** | TypeScript | JWT sign/verify utilities, AES-256-GCM envelope encryption, key rotation helpers |
+| **packages/security** | TypeScript | AES-256-GCM encryption utilities, envelope encryption, key rotation helpers |
+| **packages/sdk** | TypeScript | Official TypeScript SDK |
 | **packages/oauth-connectors** | TypeScript | Provider OAuth abstraction over oauth4webapi (auth code, refresh, revoke) |
+| **packages/openclaw** | TypeScript | OpenClaw Gateway plugin |
+| **packages/agenthifive-mcp** | TypeScript | MCP server (stdio transport) |
+| **packages/openclaw-setup** | TypeScript | OpenClaw setup and configuration utilities |
+| **packages/integration-sdk** | TypeScript | Integration SDK for third-party integrations |
 
 ## Core Principles
 
@@ -60,7 +67,7 @@ Browser                  apps/web (Next.js)              apps/api (Fastify)
 ```
 AI Agent                   Nginx                    apps/api (Fastify)        Provider API
   |                          |                            |                       |
-  |-- POST /v1/proxy ------->|                            |                       |
+  |-- POST /v1/vault/execute ->|                            |                       |
   |   (Bearer JWT)           |-- cookie hash (ah5sid) --->|                       |
   |                          |                            |-- policy check (~0.1ms)
   |                          |                            |-- decrypt token (~1ms) |

@@ -90,7 +90,7 @@ We recommend setting up a notification channel (e.g., Telegram or Slack) so you 
 On the machine running OpenClaw, install the AgentHiFive plugin:
 
 ```bash
-openclaw plugins install @agenthifive/openclaw@0.4.5
+openclaw plugins install @agenthifive/agenthifive@0.4.6
 ```
 
 :::tip Version pinning
@@ -102,7 +102,7 @@ We recommend pinning the version to avoid unexpected changes. Check the [latest 
 Run the interactive setup:
 
 ```bash
-npx @agenthifive/openclaw-setup@0.2.17
+npx @agenthifive/openclaw-setup@0.2.18
 ```
 
 The setup will walk you through:

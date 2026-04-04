@@ -49,11 +49,11 @@ Microsoft services support **multiple connections** per workspace. Each connecti
 
 | Service ID | Graph API Permissions | Capabilities |
 |-----------|----------------------|-------------|
-| `microsoft-teams` | `Chat.Read`, `Chat.ReadWrite`, `ChatMessage.Send` | Read/send chat messages, manage channels |
-| `microsoft-outlook-mail` | `Mail.Read`, `Mail.Send` | Read and send emails |
-| `microsoft-outlook-calendar` | `Calendars.Read`, `Calendars.ReadWrite` | Read and create events |
-| `microsoft-outlook-contacts` | `Contacts.Read`, `Contacts.ReadWrite` | Read and manage contacts |
-| `microsoft-onedrive` | `Files.Read`, `Files.ReadWrite` | Read, upload, and manage files |
+| `microsoft-teams` | `Chat.Read`, `Chat.ReadWrite`, `ChatMessage.Send`, `User.Read`, `Files.Read.All`, `Files.ReadWrite.All`, `offline_access`, `ChannelMessage.Read.All`, `ChannelMessage.Send` | Read/send chat messages, read/share files, manage channels |
+| `microsoft-outlook-mail` | `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`, `User.Read`, `offline_access` | Read and send emails |
+| `microsoft-outlook-calendar` | `Calendars.Read`, `Calendars.ReadWrite`, `User.Read`, `offline_access` | Read and create events |
+| `microsoft-outlook-contacts` | `Contacts.Read`, `Contacts.ReadWrite`, `User.Read`, `offline_access` | Read and manage contacts |
+| `microsoft-onedrive` | `Files.Read`, `Files.ReadWrite`, `User.Read`, `offline_access` | Read, upload, and manage files |
 
 ## Vault API Usage
 

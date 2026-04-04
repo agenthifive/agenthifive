@@ -101,13 +101,34 @@ Run `pnpm turbo run build --filter='./packages/*'` to verify that shared package
 
 | Command | Description |
 |---------|-------------|
+| `make prereqs` | Install prerequisites (nvm, Node.js 24, pnpm, Docker) |
 | `make init` | Full project setup (install, Docker up, migrate) |
-| `make dev` | Start web and API dev servers |
+| `make reset-env` | Reset `.env` from `core/.env.example` |
+| `make dev` | Start all dev servers (web + api + admin) |
+| `make dev-web` | Start only Next.js web (port 3000) |
+| `make dev-api` | Start only Fastify API (port 4000) |
+| `make dev-admin` | Start only Admin SPA (port 3002) |
+| `make dev-docs` | Start Docusaurus (port 3001) |
 | `make up` | Start PostgreSQL in Docker |
 | `make down` | Stop Docker services |
 | `make down-hard` | Stop and remove Docker volumes |
+| `make logs` | Tail Docker logs |
+| `make prod` | Build and start production stack |
+| `make prod-build` | Rebuild production images |
+| `make prod-down` | Stop production stack |
+| `make prod-logs` | Tail production logs |
 | `make build` | Build all packages and apps |
 | `make migrate` | Run database migrations |
+| `make migrate-generate` | Generate a new migration |
+| `make db-reset` | Drop and recreate the database |
+| `make psql` | Connect to PostgreSQL shell |
+| `make dummydata` | Seed example data |
+| `make lint` | Run linter |
+| `make typecheck` | Run TypeScript checks |
+| `make test` | Run tests |
+| `make rebase` | Bump core submodule to latest public repo |
+| `make clean` | Remove all build artifacts and node_modules |
+| `make kill` | Stop everything |
 
 ## Next Steps
 
