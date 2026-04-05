@@ -32,45 +32,58 @@ The web UI will be available at **http://localhost:3000** and the API at **http:
 Open your browser and navigate to **http://localhost:3000**.
 
 1. Click **Sign Up** to create a new account
-2. Register with email and password, or use a social login provider (Google, GitHub)
-3. After registration, you will be redirected to the dashboard
+2. Register with email and password, or use a social login provider (Google, Microsoft)
+3. Check your email for a **verification link** and click it to verify your account
+4. After verification, log in to be redirected to the dashboard
 
 ![The AgentHiFive dashboard showing your agents and connected apps](/img/getting-started/dashboard-agents.jpg)
 
-:::tip
-AgentHiFive supports passkey authentication. After your initial registration, you can add a passkey from your account settings for passwordless login.
+:::info Email verification
+AgentHiFive requires email verification before you can log in. If you are running locally with `EMAIL_PROVIDER=noop` (the default for development), verification emails are logged to the console instead of being sent. Check the API server output for a line containing the verification URL and open it in your browser.
+
+Alternatively, set `EMAIL_PROVIDER=smtp` with an [Ethereal](https://ethereal.email/) account for a real inbox during development.
 :::
 
-## Step 3: Create a Workspace
+## Step 3: Your Workspace
 
-Workspaces organize your connections, agents, and policies. From the dashboard:
+A workspace is automatically created when you register. It organizes your connections, agents, and policies. You can rename it from **Settings** in the sidebar.
 
-1. Click **Create Workspace**
-2. Enter a workspace name (e.g., "My AI Project")
-3. Select your desired settings and confirm
-
-All subsequent resources will be scoped to this workspace.
+All subsequent resources are scoped to this workspace.
 
 ## Step 4: Add a Connection
 
-A connection links your external provider account to AgentHiFive. Navigate to **Connections** in the sidebar:
+A connection links your external provider account to AgentHiFive. Navigate to **Connections** in the sidebar and click **Add Connection**.
 
-1. Click **Add Connection**
-2. Choose a provider (Google Workspace, Microsoft Teams, or Telegram)
-3. Follow the OAuth flow to authorize access
+### OAuth Connections (Google, Microsoft)
 
-![Add Connection dialog — select a provider and access level](/img/getting-started/add-connection-accounts.jpg)
+For Google Workspace or Microsoft 365:
 
-For this example, we will use Google Workspace:
-
-1. Select **Google Workspace**
-2. Click **Authorize** -- you will be redirected to Google's consent screen
+1. Select the service (e.g., **Gmail**, **Outlook Mail**)
+2. Click **Authorize** — you will be redirected to the provider's consent screen
 3. Grant the requested permissions
 4. You will be redirected back to AgentHiFive with the connection active
 
+![Add Connection dialog — select a provider and access level](/img/getting-started/add-connection-accounts.jpg)
+
 :::warning
-Make sure you have configured the appropriate OAuth credentials (`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`) in your `.env` file. See the [Installation](./installation) guide for details.
+Make sure you have configured the appropriate OAuth credentials (`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, or `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`) in your `.env` file, and that your redirect URI (`http://localhost:4000/v1/connections/callback`) is registered in your provider's developer console. See the [Google](/connections/google) or [Microsoft](/connections/microsoft) connection guides for details.
 :::
+
+### API Key Connections (Anthropic, OpenAI, Gemini, OpenRouter)
+
+For LLM providers and other API-key services:
+
+1. Select the service (e.g., **Anthropic**, **OpenAI**)
+2. Enter your API key
+3. AgentHiFive validates the key and creates the connection
+
+### Bot Token Connections (Telegram, Slack)
+
+For messaging platforms:
+
+1. Select the service (e.g., **Telegram**, **Slack**)
+2. Enter your bot token
+3. AgentHiFive validates the token and creates the connection
 
 ## Step 5: Create an Agent
 

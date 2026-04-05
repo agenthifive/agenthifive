@@ -1,0 +1,17 @@
+{
+  "name": "@agenthifive/docs-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx integration-testing/docs-e2e/src/run.ts"
+  },
+  "dependencies": {
+    "jose": "^5.9.3",
+    "playwright": "^1.59.1",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}
