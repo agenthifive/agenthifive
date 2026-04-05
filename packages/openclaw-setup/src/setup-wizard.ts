@@ -397,7 +397,7 @@ function loadOpenClawProviderModels(provider: string): ModelDef[] | null {
   try {
     const stdout = execSync(
       `openclaw models list --all --provider ${provider} --json`,
-      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8" },
+      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 8000 },
     );
     const models = parseOpenClawModelList(provider, stdout);
     return models.length > 0 ? models : null;
@@ -1618,82 +1618,96 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
   logConnections(log, vaultConnections);
   const { connections, connectedProviders, proxiedProviders, channelServices } =
     classifyConnections(vaultConnections);
-  const providerModels = resolveProviderModels(proxiedProviders);
-  const existingConfig = readExistingConfig(configPath);
 
-  const action = await showConfigureConnectionsMenu(log, channelServices, existingConfig);
+  // Menu loop — keeps returning to the menu after each action until "Done"
+  while (true) {
+    const existingConfig = readExistingConfig(configPath);
+    const action = await showConfigureConnectionsMenu(log, channelServices, existingConfig);
 
-  if (action.kind === "done") {
-    log("  No changes made.");
-    return;
-  }
-
-  if (action.kind === "change-model") {
-    const defaultModel = await pickDefaultModel(log, proxiedProviders, providerModels, opts);
-
-    if (!defaultModel) {
-      log("  No model selected.");
-      return;
+    if (action.kind === "done") {
+      log("  Done.");
+      break;
     }
 
-    const agentsUpdate = {
-      agents: { defaults: { model: defaultModel } },
-      tools: { alsoAllow: ["group:plugins"] },
-    };
-    const merged = mergePluginConfig(existingConfig, agentsUpdate);
+    if (action.kind === "change-model") {
+      // Lazy-load models only when the user actually selects this option
+      log("  Loading available models...");
+      const providerModels = resolveProviderModels(proxiedProviders);
 
-    writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
+      // Let the user know if we fell back to the hardcoded list
+      for (const provider of proxiedProviders) {
+        if (providerModels[provider] === DEFAULT_MODELS[provider]) {
+          log(`  (Using default model list for ${provider} — start the OpenClaw gateway for the full catalog)`);
+        }
+      }
+
+      const defaultModel = await pickDefaultModel(log, proxiedProviders, providerModels, opts);
+
+      if (!defaultModel) {
+        log("  No model selected.");
+        continue;
+      }
+
+      const agentsUpdate = {
+        agents: { defaults: { model: defaultModel } },
+        tools: { alsoAllow: ["group:plugins"] },
+      };
+      const merged = mergePluginConfig(existingConfig, agentsUpdate);
+
+      writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
+
+      log("");
+      log(`  Default model updated to: ${defaultModel}`);
+      log(`  Config saved: ${configPath}`);
+      continue;
+    }
+
+    // Toggle channel service
+    const currentProviders = getExistingVaultManagedProviders(existingConfig);
+    const displayName = channelDisplayName(action.service);
+    let actionSummary: string;
+
+    if (action.service in currentProviders) {
+      delete currentProviders[action.service];
+      actionSummary = `${displayName} removed from this OpenClaw config`;
+    } else {
+      const template = CHANNEL_CONFIGS[action.service];
+      if (!template) {
+        throw new Error(`Unsupported channel service: ${action.service}`);
+      }
+      currentProviders[action.service] = { ...template.config };
+      actionSummary = `${displayName} connected from the vault`;
+    }
+
+    const existingAgents = (existingConfig.agents as Record<string, unknown>) ?? {};
+    const existingDefaults = (existingAgents.defaults as Record<string, unknown>) ?? {};
+    const defaultModel = (existingDefaults.model as string) ?? undefined;
+    const providerModels = resolveProviderModels(proxiedProviders);
+
+    const configBlock = buildConfigOutput({
+      baseUrl: existingAuth.baseUrl,
+      agentId: existingAuth.agentId,
+      privateKey: existingAuth.privateKey,
+      connections,
+      connectedProviders,
+      proxiedProviders,
+      defaultModel,
+      channels: currentProviders,
+      providerModels,
+    });
+
+    writeConfig(log, configPath, configBlock as Record<string, unknown>, {
+      agentId: existingAuth.agentId,
+      baseUrl: existingAuth.baseUrl,
+      connectedProviders,
+      proxiedProviders,
+      defaultModel,
+    });
 
     log("");
-    log(`  Default model updated to: ${defaultModel}`);
-    log(`  Config saved: ${configPath}`);
-    logDone(log, defaultModel, proxiedProviders);
-    return;
+    log(`  ${actionSummary}.`);
+    continue;
   }
-
-  const currentProviders = getExistingVaultManagedProviders(existingConfig);
-  const displayName = channelDisplayName(action.service);
-  let actionSummary: string;
-
-  if (action.service in currentProviders) {
-    delete currentProviders[action.service];
-    actionSummary = `${displayName} removed from this OpenClaw config`;
-  } else {
-    const template = CHANNEL_CONFIGS[action.service];
-    if (!template) {
-      throw new Error(`Unsupported channel service: ${action.service}`);
-    }
-    currentProviders[action.service] = { ...template.config };
-    actionSummary = `${displayName} connected from the vault`;
-  }
-
-  const existingAgents = (existingConfig.agents as Record<string, unknown>) ?? {};
-  const existingDefaults = (existingAgents.defaults as Record<string, unknown>) ?? {};
-  const defaultModel = (existingDefaults.model as string) ?? undefined;
-
-  const configBlock = buildConfigOutput({
-    baseUrl: existingAuth.baseUrl,
-    agentId: existingAuth.agentId,
-    privateKey: existingAuth.privateKey,
-    connections,
-    connectedProviders,
-    proxiedProviders,
-    defaultModel,
-    channels: currentProviders,
-    providerModels,
-  });
-
-  writeConfig(log, configPath, configBlock as Record<string, unknown>, {
-    agentId: existingAuth.agentId,
-    baseUrl: existingAuth.baseUrl,
-    connectedProviders,
-    proxiedProviders,
-    defaultModel,
-  });
-
-  log("");
-  log(`  ${actionSummary}.`);
-  logDone(log, defaultModel, proxiedProviders);
 }
 
 // ---------------------------------------------------------------------------

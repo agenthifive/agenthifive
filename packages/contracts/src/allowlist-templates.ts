@@ -979,6 +979,8 @@ export const SERVICE_DEFAULT_ALLOWLISTS: Record<string, AllowlistEntry[]> = {
         "/v1beta/models/*:streamGenerateContent",
         "/v1beta/models/*:embedContent",
         "/v1beta/models/*:batchEmbedContents",
+        "/v1beta/responses",
+        "/v1beta/responses/*",
       ],
     },
   ],
