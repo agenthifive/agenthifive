@@ -65,6 +65,8 @@ function buildInjectedCode(): string {
 \t\tconst ah5rt = globalThis.__ah5_runtime;
 \t\tif (ah5rt?.proxiedProviders?.includes(provider) && ah5rt?.vaultBearerToken) {
 \t\t\treturn { apiKey: ah5rt.vaultBearerToken, source: "vault:agent-token", mode: "api-key" };
+\t\t} else if (ah5rt) {
+\t\t\tconsole.warn("[AH5 patch] provider \\"%s\\" not in proxiedProviders %s (token=%s)", provider, JSON.stringify(ah5rt.proxiedProviders), ah5rt.vaultBearerToken ? "set" : "null");
 \t\t}
 \t} catch (ah5Err) {
 \t\tconsole.error("[AH5 patch] error:", ah5Err?.message ?? ah5Err);
