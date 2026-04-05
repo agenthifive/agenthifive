@@ -1669,7 +1669,7 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
       // Lazy-load models only when the user actually selects this option.
       // This can take 30-40s because `openclaw models list --all` loads every
       // provider's catalog. Show a clear message so the user knows to wait.
-      log("  Loading available models (this may take 30-40 seconds)...");
+      log("  Loading available models [v2 single-catalog]...");
       const providerModels = resolveProviderModels(proxiedProviders);
 
       // Let the user know if we fell back to the hardcoded list
