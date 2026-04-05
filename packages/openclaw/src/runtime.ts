@@ -83,10 +83,28 @@ export function setCredentialProvider(provider: CredentialProvider | null): void
 }
 
 /**
+ * Provider aliases — OpenClaw uses different internal names for some providers.
+ * For example, Gemini is "gemini" in our config but "google" in OpenClaw's
+ * resolveApiKeyForProvider(). The patch checks proxiedProviders.includes(provider),
+ * so we must include all aliases.
+ */
+const PROVIDER_ALIASES: Record<string, string[]> = {
+  gemini: ["gemini", "google"],
+};
+
+/**
  * Called by register.ts to set the list of providers that should use vault bearer tokens.
+ * Automatically expands known aliases (e.g., "gemini" → ["gemini", "google"]).
  */
 export function setProxiedProviders(providers: string[]): void {
-  getState().proxiedProviders = providers;
+  const expanded = new Set<string>();
+  for (const p of providers) {
+    expanded.add(p);
+    for (const alias of PROVIDER_ALIASES[p] ?? []) {
+      expanded.add(alias);
+    }
+  }
+  getState().proxiedProviders = [...expanded];
 }
 
 // ---------------------------------------------------------------------------

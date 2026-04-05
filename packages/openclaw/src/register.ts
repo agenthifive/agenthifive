@@ -803,9 +803,10 @@ function initRuntimeProvider(
   pluginConfig: Record<string, unknown>,
   logger: PluginLogger,
 ): void {
-  // Set proxied providers list
+  // Set proxied providers list (setProxiedProviders expands aliases like gemini→google)
   const proxied = (pluginConfig.proxiedProviders ?? []) as string[];
   setProxiedProviders(proxied);
+  logger.info?.(`Proxied providers: [${proxied.join(", ")}] (expanded with aliases for patch matching)`);
 
   // Set credential provider (currently a stub that returns null —
   // all access goes through Model B. When credential vending is
@@ -819,8 +820,6 @@ function initRuntimeProvider(
     onTokenRefresh: () => _tokenManager?.forceRefresh() ?? Promise.resolve(false),
   });
   setCredentialProvider(provider);
-
-  // proxied providers configured silently
 }
 
 // ---------------------------------------------------------------------------
