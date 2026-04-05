@@ -403,19 +403,18 @@ function getOpenClawCatalogProviderId(provider: string): string {
   return provider;
 }
 
-function loadOpenClawProviderModels(provider: string): ModelDef[] | null {
-  const catalogProvider = getOpenClawCatalogProviderId(provider);
+/**
+ * Load the full model catalog from OpenClaw in a single call.
+ * Returns the raw JSON output, or null if the command fails.
+ */
+function loadOpenClawFullCatalog(): string | null {
   try {
-    // `openclaw models list --all` can take 30-40s as it loads every provider's
-    // catalog. The timeout is generous because we already show a loading message.
-    const stdout = execSync(
-      `openclaw models list --all --provider ${catalogProvider} --json`,
-      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 45_000 },
+    // Single call to load ALL providers' models. This takes 30-40s because
+    // OpenClaw scans every provider. We only call it once and parse per-provider.
+    return execSync(
+      "openclaw models list --all --json",
+      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 60_000 },
     );
-    // Parse using the catalog provider ID (e.g., "google") because the CLI
-    // returns model keys like "google/gemini-2.0-flash", not "gemini/...".
-    const models = parseOpenClawModelList(catalogProvider, stdout);
-    return models.length > 0 ? models : null;
   } catch {
     return null;
   }
@@ -424,8 +423,23 @@ function loadOpenClawProviderModels(provider: string): ModelDef[] | null {
 export function resolveProviderModels(proxiedProviders: string[]): Record<string, ModelDef[]> {
   const resolved: Record<string, ModelDef[]> = {};
 
+  // Load full catalog once (not per-provider)
+  const catalogJson = loadOpenClawFullCatalog();
+
   for (const provider of proxiedProviders) {
-    resolved[provider] = loadOpenClawProviderModels(provider)
+    const catalogProvider = getOpenClawCatalogProviderId(provider);
+    let models: ModelDef[] | null = null;
+
+    if (catalogJson) {
+      try {
+        models = parseOpenClawModelList(catalogProvider, catalogJson);
+        if (models.length === 0) models = null;
+      } catch {
+        models = null;
+      }
+    }
+
+    resolved[provider] = models
       ?? DEFAULT_MODELS[provider]
       ?? [{ id: "default", name: "Default", input: ["text"] }];
   }
