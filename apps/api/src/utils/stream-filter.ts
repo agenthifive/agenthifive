@@ -24,6 +24,83 @@ import { filterResponse, type CompiledPolicyRules } from "../services/policy-eng
 
 type CompiledResponseRule = CompiledPolicyRules["response"][number];
 
+/**
+ * Apply filtered changes to the original JSON string without re-serializing.
+ *
+ * When filterResponse() modifies an object (e.g., PII redaction replaces string
+ * values), we need to emit the changes without re-formatting the entire JSON.
+ * Re-serializing with JSON.stringify() strips the provider's whitespace style,
+ * which breaks some SDK incremental parsers.
+ *
+ * Strategy: collect all string value changes between original and filtered objects,
+ * then perform targeted string replacements on the original JSON. If the changes
+ * are too complex (field additions/removals, structural changes), fall back to
+ * JSON.stringify() as a last resort.
+ */
+function applyJsonChanges(originalJson: string, original: unknown, filtered: unknown): string {
+  // Fast path: no changes
+  const filteredJson = JSON.stringify(filtered);
+  if (JSON.stringify(original) === filteredJson) return originalJson;
+
+  // Collect string replacements by walking both trees
+  const replacements: Array<[string, string]> = [];
+  collectStringChanges(original, filtered, replacements);
+
+  if (replacements.length === 0) {
+    // Non-string changes (field removal, structural) — must re-serialize
+    return filteredJson;
+  }
+
+  // Apply replacements to the original JSON string
+  let result = originalJson;
+  for (const [oldVal, newVal] of replacements) {
+    // Escape for JSON string context: the values appear inside "..." in the JSON
+    const oldEscaped = JSON.stringify(oldVal).slice(1, -1); // strip surrounding quotes
+    const newEscaped = JSON.stringify(newVal).slice(1, -1);
+    result = result.replace(oldEscaped, newEscaped);
+  }
+
+  // Sanity check: the result must be valid JSON
+  try {
+    JSON.parse(result);
+    return result;
+  } catch {
+    // Replacement corrupted the JSON — fall back to re-serialization
+    return filteredJson;
+  }
+}
+
+function collectStringChanges(
+  original: unknown,
+  filtered: unknown,
+  out: Array<[string, string]>,
+): void {
+  if (typeof original === "string" && typeof filtered === "string") {
+    if (original !== filtered) {
+      out.push([original, filtered]);
+    }
+    return;
+  }
+  if (Array.isArray(original) && Array.isArray(filtered)) {
+    for (let i = 0; i < Math.min(original.length, filtered.length); i++) {
+      collectStringChanges(original[i], filtered[i], out);
+    }
+    return;
+  }
+  if (typeof original === "object" && original !== null &&
+      typeof filtered === "object" && filtered !== null) {
+    for (const key of Object.keys(original as Record<string, unknown>)) {
+      if (key in (filtered as Record<string, unknown>)) {
+        collectStringChanges(
+          (original as Record<string, unknown>)[key],
+          (filtered as Record<string, unknown>)[key],
+          out,
+        );
+      }
+    }
+  }
+}
+
 export interface StreamFilter {
   /** Process a chunk of streaming data. Returns filtered output (may be empty string if buffering). */
   transform(chunk: string): string;
@@ -112,15 +189,11 @@ class SseStreamFilter implements StreamFilter {
         try {
           const parsed = JSON.parse(jsonStr);
           const filtered = filterResponse(this.rules, this.method, this.urlPath, parsed, this.queryString);
-          // Only re-serialize if the filter actually changed the content.
-          // This preserves the original JSON formatting (whitespace, key order)
-          // which some SDKs rely on for incremental/streaming parsing.
-          const reserialized = JSON.stringify(filtered);
-          if (reserialized === JSON.stringify(parsed)) {
-            outputLines.push(line);
-          } else {
-            outputLines.push(`data: ${reserialized}`);
-          }
+          // Apply string-level replacements directly to the original JSON
+          // to preserve the provider's exact formatting (whitespace, key order).
+          // Re-serializing with JSON.stringify() produces compact JSON that
+          // breaks some SDK incremental parsers (e.g., OpenClaw + Gemini SSE).
+          outputLines.push(`data: ${applyJsonChanges(jsonStr, parsed, filtered)}`);
         } catch {
           // Not valid JSON — pass through unchanged
           outputLines.push(line);
@@ -176,10 +249,7 @@ class NdjsonStreamFilter implements StreamFilter {
     try {
       const parsed = JSON.parse(trimmed);
       const filtered = filterResponse(this.rules, this.method, this.urlPath, parsed, this.queryString);
-      const reserialized = JSON.stringify(filtered);
-      // Preserve original formatting if content unchanged
-      if (reserialized === JSON.stringify(parsed)) return line;
-      return reserialized + "\n";
+      return applyJsonChanges(trimmed, parsed, filtered) + "\n";
     } catch {
       return line; // not JSON — pass through
     }
