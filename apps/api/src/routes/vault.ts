@@ -4040,6 +4040,8 @@ export async function executeModelBRequest(
 
     const hasResponseRules = ctx.compiledRules && ctx.compiledRules.response.length > 0;
     let totalBytes = 0;
+    let totalOutputBytes = 0;
+    let chunkCount = 0;
 
     try {
       if (hasResponseRules) {
@@ -4055,24 +4057,37 @@ export async function executeModelBRequest(
         for await (const chunk of providerResponse.body) {
           const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
           totalBytes += text.length;
+          chunkCount++;
           const filtered = filter.transform(text);
-          if (filtered) reply.raw.write(filtered);
+          if (filtered) {
+            totalOutputBytes += filtered.length;
+            reply.raw.write(filtered);
+          }
         }
         const remaining = filter.flush();
-        if (remaining) reply.raw.write(remaining);
+        if (remaining) {
+          totalOutputBytes += remaining.length;
+          reply.raw.write(remaining);
+        }
       } else {
         // No response rules — zero-overhead passthrough
         for await (const chunk of providerResponse.body) {
           const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
           totalBytes += text.length;
+          totalOutputBytes += text.length;
+          chunkCount++;
           reply.raw.write(text);
         }
       }
     } catch (err) {
       if (!ctx.rawRequest?.raw.destroyed) {
-        (log ?? fastify.log).error({ err, connectionId }, "Streaming error");
+        (log ?? fastify.log).error({ err, connectionId, chunkCount, totalBytes, totalOutputBytes }, "Streaming error");
       }
     } finally {
+      (log ?? fastify.log).info(
+        { connectionId, provider: connection.provider, chunkCount, totalBytes, totalOutputBytes, filtered: hasResponseRules, contentType: upstreamContentType },
+        "vault.stream.done",
+      );
       reply.raw.end();
       // Audit log stream completion (fire-and-forget)
       logExecutionCompleted(sub, policy.agentId, connectionId, {
