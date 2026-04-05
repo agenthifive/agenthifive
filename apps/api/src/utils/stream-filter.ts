@@ -43,21 +43,13 @@ function applyJsonChanges(originalJson: string, original: unknown, filtered: unk
   const originalSerialized = JSON.stringify(original);
   if (originalSerialized === filteredJson) return originalJson;
 
-  console.warn("[stream-filter] applyJsonChanges: content was modified, replacements=%d, origLen=%d, filtLen=%d",
-    0, originalJson.length, filteredJson.length);
-
   // Collect string replacements by walking both trees
   const replacements: Array<[string, string]> = [];
   collectStringChanges(original, filtered, replacements);
 
-  console.warn("[stream-filter] applyJsonChanges: string replacements found: %d", replacements.length);
-  for (const [old, nw] of replacements) {
-    console.warn("[stream-filter]   '%s' -> '%s'", old.slice(0, 50), nw.slice(0, 50));
-  }
-
   if (replacements.length === 0) {
-    // Non-string changes (field removal, structural) — must re-serialize
-    console.warn("[stream-filter] applyJsonChanges: structural change, falling back to JSON.stringify");
+    // Non-string changes (field removal, structural) — must re-serialize.
+    // This loses the provider's formatting but is the only safe option.
     return filteredJson;
   }
 
@@ -75,7 +67,7 @@ function applyJsonChanges(originalJson: string, original: unknown, filtered: unk
     JSON.parse(result);
     return result;
   } catch {
-    // Replacement corrupted the JSON — fall back to re-serialization
+    // Targeted replacement corrupted the JSON — fall back to re-serialization
     return filteredJson;
   }
 }
@@ -199,14 +191,7 @@ class SseStreamFilter implements StreamFilter {
         try {
           const parsed = JSON.parse(jsonStr);
           const filtered = filterResponse(this.rules, this.method, this.urlPath, parsed, this.queryString);
-          const result = applyJsonChanges(jsonStr, parsed, filtered);
-          const changed = result !== jsonStr;
-          if (changed) {
-            console.warn("[stream-filter] SSE data line modified: original=%d bytes, result=%d bytes, diff at byte %d",
-              jsonStr.length, result.length,
-              [...jsonStr].findIndex((c, i) => c !== result[i]));
-          }
-          outputLines.push(`data: ${result}`);
+          outputLines.push(`data: ${applyJsonChanges(jsonStr, parsed, filtered)}`);
         } catch {
           // Not valid JSON — pass through unchanged
           outputLines.push(line);
