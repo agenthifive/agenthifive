@@ -411,10 +411,17 @@ function loadOpenClawFullCatalog(): string | null {
   try {
     // Single call to load ALL providers' models. This takes 30-40s because
     // OpenClaw scans every provider. We only call it once and parse per-provider.
-    return execSync(
+    const raw = execSync(
       "openclaw models list --all --json",
       { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 60_000 },
     );
+    // OpenClaw may emit plugin log lines (e.g., "[plugins] AgentHiFive v0.4.6 ready")
+    // to stdout before the JSON. Find the first line starting with "{" to get the JSON.
+    const jsonStart = raw.indexOf("\n{");
+    if (jsonStart !== -1) return raw.slice(jsonStart + 1);
+    // If the output starts with "{", it's pure JSON
+    if (raw.trimStart().startsWith("{")) return raw.trimStart();
+    return null;
   } catch {
     return null;
   }
