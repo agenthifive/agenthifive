@@ -450,8 +450,16 @@ export function resolveProviderModels(proxiedProviders: string[], log?: (msg: st
     if (catalogJson) {
       try {
         models = parseOpenClawModelList(catalogProvider, catalogJson);
-        if (models.length === 0) models = null;
-      } catch {
+        log?.(`  [catalog] parsed ${catalogProvider}: ${models.length} models`);
+        if (models.length === 0) {
+          // Debug: show what keys exist in the catalog
+          const parsed = JSON.parse(catalogJson) as { models?: Array<{ key?: string }> };
+          const keys = (parsed.models ?? []).map(m => m.key ?? "?").filter(k => k.startsWith(catalogProvider + "/")).slice(0, 3);
+          log?.(`  [catalog] sample keys for "${catalogProvider}": ${keys.length > 0 ? keys.join(", ") : "NONE"}`);
+          models = null;
+        }
+      } catch (err) {
+        log?.(`  [catalog] parse error for ${catalogProvider}: ${err instanceof Error ? err.message : String(err)}`);
         models = null;
       }
     }
