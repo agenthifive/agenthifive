@@ -112,7 +112,15 @@ class SseStreamFilter implements StreamFilter {
         try {
           const parsed = JSON.parse(jsonStr);
           const filtered = filterResponse(this.rules, this.method, this.urlPath, parsed, this.queryString);
-          outputLines.push(`data: ${JSON.stringify(filtered)}`);
+          // Only re-serialize if the filter actually changed the content.
+          // This preserves the original JSON formatting (whitespace, key order)
+          // which some SDKs rely on for incremental/streaming parsing.
+          const reserialized = JSON.stringify(filtered);
+          if (reserialized === JSON.stringify(parsed)) {
+            outputLines.push(line);
+          } else {
+            outputLines.push(`data: ${reserialized}`);
+          }
         } catch {
           // Not valid JSON — pass through unchanged
           outputLines.push(line);
@@ -168,7 +176,10 @@ class NdjsonStreamFilter implements StreamFilter {
     try {
       const parsed = JSON.parse(trimmed);
       const filtered = filterResponse(this.rules, this.method, this.urlPath, parsed, this.queryString);
-      return JSON.stringify(filtered) + "\n";
+      const reserialized = JSON.stringify(filtered);
+      // Preserve original formatting if content unchanged
+      if (reserialized === JSON.stringify(parsed)) return line;
+      return reserialized + "\n";
     } catch {
       return line; // not JSON — pass through
     }
