@@ -967,20 +967,33 @@ export const SERVICE_DEFAULT_ALLOWLISTS: Record<string, AllowlistEntry[]> = {
     { baseUrl: "https://api.openai.com", methods: ["GET", "POST"], pathPatterns: ["/v1/models", "/v1/models/*", "/v1/chat/completions", "/v1/responses", "/v1/embeddings"] },
   ],
 
-  // ── Gemini (Generate + Embed) ──
+  // ── Gemini (Generate + Embed + Batch) ──
   gemini: [
     {
       baseUrl: "https://generativelanguage.googleapis.com",
       methods: ["GET", "POST"],
       pathPatterns: [
+        // Model discovery
         "/v1beta/models",
         "/v1beta/models/*",
+        // Generation (streaming and non-streaming)
         "/v1beta/models/*:generateContent",
         "/v1beta/models/*:streamGenerateContent",
+        // Token counting
+        "/v1beta/models/*:countTokens",
+        // Embeddings (single, batch, async batch)
         "/v1beta/models/*:embedContent",
         "/v1beta/models/*:batchEmbedContents",
+        "/v1beta/models/*:asyncBatchEmbedContent",
+        // Responses API
         "/v1beta/responses",
         "/v1beta/responses/*",
+        // File upload for batch processing
+        "/upload/v1beta/files*",
+        "/upload/v1beta/files/*",
+        "/upload/v1beta/files/*:download",
+        // Batch operation tracking
+        "/v1beta/batches/*",
       ],
     },
   ],

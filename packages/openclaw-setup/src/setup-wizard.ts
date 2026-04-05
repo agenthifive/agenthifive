@@ -393,13 +393,28 @@ export function parseOpenClawModelList(provider: string, value: string): ModelDe
   return models;
 }
 
+/**
+ * Map our internal provider name to the provider ID that OpenClaw's
+ * model catalog uses. For example, we call it "gemini" but OpenClaw's
+ * `openclaw models list --provider` expects "google".
+ */
+function getOpenClawCatalogProviderId(provider: string): string {
+  if (provider === "gemini") return "google";
+  return provider;
+}
+
 function loadOpenClawProviderModels(provider: string): ModelDef[] | null {
+  const catalogProvider = getOpenClawCatalogProviderId(provider);
   try {
+    // `openclaw models list --all` can take 30-40s as it loads every provider's
+    // catalog. The timeout is generous because we already show a loading message.
     const stdout = execSync(
-      `openclaw models list --all --provider ${provider} --json`,
-      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 8000 },
+      `openclaw models list --all --provider ${catalogProvider} --json`,
+      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 45_000 },
     );
-    const models = parseOpenClawModelList(provider, stdout);
+    // Parse using the catalog provider ID (e.g., "google") because the CLI
+    // returns model keys like "google/gemini-2.0-flash", not "gemini/...".
+    const models = parseOpenClawModelList(catalogProvider, stdout);
     return models.length > 0 ? models : null;
   } catch {
     return null;
@@ -1630,8 +1645,10 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
     }
 
     if (action.kind === "change-model") {
-      // Lazy-load models only when the user actually selects this option
-      log("  Loading available models...");
+      // Lazy-load models only when the user actually selects this option.
+      // This can take 30-40s because `openclaw models list --all` loads every
+      // provider's catalog. Show a clear message so the user knows to wait.
+      log("  Loading available models (this may take 30-40 seconds)...");
       const providerModels = resolveProviderModels(proxiedProviders);
 
       // Let the user know if we fell back to the hardcoded list
