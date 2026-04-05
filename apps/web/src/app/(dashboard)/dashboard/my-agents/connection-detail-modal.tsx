@@ -613,6 +613,7 @@ export default function ConnectionDetailModal({
                             allowedModels: policy.allowedModels,
                             defaultMode: policy.defaultMode,
                             stepUpApproval: policy.stepUpApproval,
+                            securityPreset: policy.securityPreset,
                             providerConstraints: policy.providerConstraints,
                           }}
                           onCreated={handlePolicySaved}

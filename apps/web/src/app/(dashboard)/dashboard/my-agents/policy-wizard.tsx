@@ -26,6 +26,7 @@ interface PolicyWizardProps {
     allowedModels: string[];
     defaultMode: string;
     stepUpApproval: string;
+    securityPreset?: string | null;
     providerConstraints?: {
       provider: string;
       allowedChatIds?: string[];
@@ -145,7 +146,7 @@ export default function PolicyWizard({
     editInitialValues?.stepUpApproval ?? "risk_based",
   );
   const [securityPreset, setSecurityPreset] = useState<"none" | "minimal" | "standard" | "strict">(
-    isEditMode ? "none" : "standard",
+    (editInitialValues?.securityPreset as "none" | "minimal" | "standard" | "strict") ?? (isEditMode ? "none" : "standard"),
   );
 
   // Track whether user has changed rules (presets/guards) — edit mode skips rules PUT if unchanged
