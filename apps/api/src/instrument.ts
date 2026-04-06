@@ -10,6 +10,8 @@
 import * as Sentry from "@sentry/node";
 
 const SENTRY_DSN = process.env["SENTRY_DSN"];
+const FATAL_FLUSH_TIMEOUT_MS = 2000;
+let fatalShutdownStarted = false;
 
 /** Header names that must never reach Sentry (lowercase). */
 const SCRUB_HEADERS = new Set([
@@ -130,29 +132,52 @@ if (SENTRY_DSN) {
   });
 }
 
+function normalizeFatalReason(reason: unknown): Error {
+  return reason instanceof Error ? reason : new Error(String(reason));
+}
+
+export async function handleProcessFatalError(
+  source: "uncaughtException" | "unhandledRejection",
+  reason: unknown,
+): Promise<void> {
+  const error = normalizeFatalReason(reason);
+  const logLabel = `[${source}]`;
+
+  // Keep a synchronous stderr breadcrumb even if Sentry never flushes.
+  console.error(logLabel, error);
+
+  if (fatalShutdownStarted) {
+    process.exit(1);
+    return;
+  }
+  fatalShutdownStarted = true;
+
+  if (SENTRY_DSN) {
+    try {
+      Sentry.captureException(error, { tags: { source } });
+      await Sentry.flush(FATAL_FLUSH_TIMEOUT_MS);
+    } catch (flushErr) {
+      console.error("[sentry.flush.failed]", flushErr);
+    }
+  }
+
+  process.exit(1);
+}
+
+export function resetFatalHandlerStateForTests(): void {
+  fatalShutdownStarted = false;
+}
+
 // ── Process-level safety net ────────────────────────────────────────
 // Catch unhandled rejections and exceptions so they reach Sentry and
 // appear in stderr instead of silently disappearing.
 
 process.on("unhandledRejection", (reason) => {
-  console.error("[unhandledRejection]", reason);
-  if (SENTRY_DSN) {
-    Sentry.captureException(
-      reason instanceof Error ? reason : new Error(String(reason)),
-      { tags: { source: "unhandledRejection" } },
-    );
-  }
+  void handleProcessFatalError("unhandledRejection", reason);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("[uncaughtException]", err);
-  if (SENTRY_DSN) {
-    Sentry.captureException(err, { tags: { source: "uncaughtException" } });
-    // Flush before crashing — give Sentry up to 2s to send
-    Sentry.flush(2000).finally(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
+  void handleProcessFatalError("uncaughtException", err);
 });
 
 export { Sentry };
