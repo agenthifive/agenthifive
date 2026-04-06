@@ -95,6 +95,19 @@ export default function CreateConnectionModal({
   const [appKeyValue, setAppKeyValue] = useState("");
   const [emailValue, setEmailValue] = useState("");
 
+  // Email (IMAP/SMTP) flow
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailDisplayName, setEmailDisplayName] = useState("");
+  const [emailImapHost, setEmailImapHost] = useState("");
+  const [emailImapPort, setEmailImapPort] = useState(993);
+  const [emailImapTls, setEmailImapTls] = useState(true);
+  const [emailSmtpHost, setEmailSmtpHost] = useState("");
+  const [emailSmtpPort, setEmailSmtpPort] = useState(587);
+  const [emailSmtpStarttls, setEmailSmtpStarttls] = useState(true);
+  const [emailUsername, setEmailUsername] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailLabel, setEmailLabel] = useState("");
+  const [emailResult, setEmailResult] = useState<{ label: string } | null>(null);
 
   // Active flow service
   const [flowService, setFlowService] = useState<ServiceId | null>(null);
@@ -215,6 +228,13 @@ export default function CreateConnectionModal({
       return;
     }
 
+    if (credType === "email") {
+      setFlowService(serviceId);
+      setStep("flow");
+      setError(null);
+      return;
+    }
+
     // OAuth flow
     startOAuthConnection(serviceId, scopes, label);
   }
@@ -328,6 +348,51 @@ export default function CreateConnectionModal({
       onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to create ${entry.displayName} connection`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Email (IMAP/SMTP) Flow ─────────────────────────────────────
+
+  async function handleEmailSubmit() {
+    if (!emailAddress.trim() || !emailImapHost.trim() || !emailSmtpHost.trim() || !emailPassword.trim() || !flowService) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload = {
+        email: emailAddress.trim(),
+        displayName: emailDisplayName.trim() || undefined,
+        imapHost: emailImapHost.trim(),
+        imapPort: emailImapPort,
+        imapTls: emailImapTls,
+        smtpHost: emailSmtpHost.trim(),
+        smtpPort: emailSmtpPort,
+        smtpStarttls: emailSmtpStarttls,
+        username: emailUsername.trim() || undefined,
+        password: emailPassword,
+        label: emailLabel.trim() || undefined,
+      };
+
+      const res = await apiFetch("/connections/email", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json()) as { error: string };
+        throw new Error(data.error);
+      }
+
+      const data = (await res.json()) as { connection: { id: string; label: string } };
+      setCreatedConnectionId(data.connection.id);
+      setCreatedServiceId(flowService);
+      setStep("success");
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create email connection");
     } finally {
       setLoading(false);
     }
@@ -795,6 +860,270 @@ export default function CreateConnectionModal({
                   <button
                     onClick={handleApiKeySubmit}
                     disabled={loading || !apiKeyValue.trim() || (!!hint.appKeyLabel && !appKeyValue.trim()) || (flowEntry.provider === "jira" && !emailValue.trim())}
+                    className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Connecting..." : "Connect"}
+                  </button>
+                </div>
+              </div>
+            </div>
+            );
+          })()}
+
+          {/* ─── Email (IMAP/SMTP) Flow ─────────────────── */}
+          {step === "flow" && flowService && SERVICE_CATALOG[flowService].credentialType === "email" && (() => {
+            const flowEntry = SERVICE_CATALOG[flowService];
+
+            const EMAIL_PRESETS: { name: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }[] = [
+              { name: "Gmail", imapHost: "imap.gmail.com", imapPort: 993, smtpHost: "smtp.gmail.com", smtpPort: 587 },
+              { name: "iCloud", imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587 },
+              { name: "Fastmail", imapHost: "imap.fastmail.com", imapPort: 993, smtpHost: "smtp.fastmail.com", smtpPort: 587 },
+              { name: "Yahoo", imapHost: "imap.mail.yahoo.com", imapPort: 993, smtpHost: "smtp.mail.yahoo.com", smtpPort: 587 },
+            ];
+
+            function applyPreset(preset: { imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }) {
+              setEmailImapHost(preset.imapHost);
+              setEmailImapPort(preset.imapPort);
+              setEmailSmtpHost(preset.smtpHost);
+              setEmailSmtpPort(preset.smtpPort);
+              setEmailImapTls(true);
+              setEmailSmtpStarttls(true);
+            }
+
+            function clearPreset() {
+              setEmailImapHost("");
+              setEmailImapPort(993);
+              setEmailSmtpHost("");
+              setEmailSmtpPort(587);
+              setEmailImapTls(true);
+              setEmailSmtpStarttls(true);
+            }
+
+            return (
+            <div className="max-w-xl mx-auto">
+              <div className="rounded-lg border border-border bg-card p-6">
+                <p className="text-sm text-muted mb-4">
+                  Connect to any email account via IMAP and SMTP. Use an app-specific password for accounts with two-factor authentication.
+                </p>
+
+                {/* Provider presets */}
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Email Provider
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {EMAIL_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => applyPreset(preset)}
+                        className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                          emailImapHost === preset.imapHost
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-border bg-white text-foreground hover:border-blue-400 hover:bg-blue-50"
+                        }`}
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={clearPreset}
+                      className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                        emailImapHost && !EMAIL_PRESETS.some((p) => p.imapHost === emailImapHost)
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : !emailImapHost
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-border bg-white text-foreground hover:border-blue-400 hover:bg-blue-50"
+                      }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                </div>
+
+                {/* Email address */}
+                <div className="mb-4">
+                  <label htmlFor="create-email-address" className="block text-sm font-medium text-foreground">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="create-email-address"
+                    type="email"
+                    value={emailAddress}
+                    onChange={(e) => setEmailAddress(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                {/* Display name */}
+                <div className="mb-4">
+                  <label htmlFor="create-email-display-name" className="block text-sm font-medium text-foreground">
+                    Display Name
+                  </label>
+                  <input
+                    id="create-email-display-name"
+                    type="text"
+                    value={emailDisplayName}
+                    onChange={(e) => setEmailDisplayName(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Your Name"
+                  />
+                </div>
+
+                {/* IMAP settings */}
+                <fieldset className="mb-4 rounded-md border border-border p-4">
+                  <legend className="px-1 text-sm font-medium text-foreground">IMAP (Incoming)</legend>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label htmlFor="create-email-imap-host" className="block text-xs font-medium text-muted">
+                        Host <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="create-email-imap-host"
+                        type="text"
+                        value={emailImapHost}
+                        onChange={(e) => setEmailImapHost(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="imap.gmail.com"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="create-email-imap-port" className="block text-xs font-medium text-muted">
+                        Port
+                      </label>
+                      <input
+                        id="create-email-imap-port"
+                        type="number"
+                        value={emailImapPort}
+                        onChange={(e) => setEmailImapPort(parseInt(e.target.value, 10) || 993)}
+                        className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={emailImapTls}
+                      onChange={(e) => setEmailImapTls(e.target.checked)}
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
+                    />
+                    Use TLS
+                  </label>
+                </fieldset>
+
+                {/* SMTP settings */}
+                <fieldset className="mb-4 rounded-md border border-border p-4">
+                  <legend className="px-1 text-sm font-medium text-foreground">SMTP (Outgoing)</legend>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label htmlFor="create-email-smtp-host" className="block text-xs font-medium text-muted">
+                        Host <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="create-email-smtp-host"
+                        type="text"
+                        value={emailSmtpHost}
+                        onChange={(e) => setEmailSmtpHost(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="create-email-smtp-port" className="block text-xs font-medium text-muted">
+                        Port
+                      </label>
+                      <input
+                        id="create-email-smtp-port"
+                        type="number"
+                        value={emailSmtpPort}
+                        onChange={(e) => setEmailSmtpPort(parseInt(e.target.value, 10) || 587)}
+                        className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={emailSmtpStarttls}
+                      onChange={(e) => setEmailSmtpStarttls(e.target.checked)}
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
+                    />
+                    Use STARTTLS
+                  </label>
+                </fieldset>
+
+                {/* Authentication */}
+                <div className="mb-4">
+                  <label htmlFor="create-email-username" className="block text-sm font-medium text-foreground">
+                    Username
+                  </label>
+                  <input
+                    id="create-email-username"
+                    type="text"
+                    value={emailUsername}
+                    onChange={(e) => setEmailUsername(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder={emailAddress || "Defaults to email address"}
+                  />
+                  <p className="mt-1 text-xs text-muted">Leave blank to use the email address as username.</p>
+                </div>
+                <div className="mb-4">
+                  <label htmlFor="create-email-password" className="block text-sm font-medium text-foreground">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="create-email-password"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm font-mono text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="App password or account password"
+                  />
+                </div>
+
+                {/* Label */}
+                <div className="mb-4">
+                  <label htmlFor="create-email-conn-label" className="block text-sm font-medium text-foreground">
+                    Connection Label
+                  </label>
+                  <input
+                    id="create-email-conn-label"
+                    type="text"
+                    value={emailLabel}
+                    onChange={(e) => setEmailLabel(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder={emailAddress ? `Email - ${emailAddress}` : "e.g., Work Email"}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setStep("select");
+                      setFlowService(null);
+                      setEmailAddress("");
+                      setEmailDisplayName("");
+                      setEmailImapHost("");
+                      setEmailImapPort(993);
+                      setEmailImapTls(true);
+                      setEmailSmtpHost("");
+                      setEmailSmtpPort(587);
+                      setEmailSmtpStarttls(true);
+                      setEmailUsername("");
+                      setEmailPassword("");
+                      setEmailLabel("");
+                      setEmailResult(null);
+                      setError(null);
+                    }}
+                    className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleEmailSubmit}
+                    disabled={loading || !emailAddress.trim() || !emailImapHost.trim() || !emailSmtpHost.trim() || !emailPassword.trim()}
                     className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Connecting..." : "Connect"}
