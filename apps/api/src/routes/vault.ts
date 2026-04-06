@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyBaseLogger } from "fastify";
 import { reply500 } from "../utils/reply-error";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { eq, ne, and, gte, count, sql } from "drizzle-orm";
 import { request as undiciRequest } from "undici";
 import { db } from "../db/client";
@@ -83,6 +83,34 @@ import {
 import { getEncryptionKey } from "../services/encryption-key";
 
 /** Explicit type for connection rows — avoids drizzle inference depth limits in large handlers */
+
+/**
+ * Compute a SHA-256 fingerprint of the normalized request payload so that
+ * approval redemption can verify the agent re-submitted the identical request.
+ * Covers body, query params, and forwarded headers — the three agent-controlled
+ * inputs that affect what the vault sends to the provider.
+ *
+ * Keys are sorted at every level to guarantee the same logical payload always
+ * produces the same hash regardless of JSON key ordering.
+ */
+function computeRequestFingerprint(
+  requestBody: unknown,
+  query: Record<string, string> | undefined,
+  headers: Record<string, string> | undefined,
+): string {
+  const canonical = JSON.stringify({
+    body: requestBody ?? null,
+    headers: headers ? Object.fromEntries(Object.entries(headers).sort()) : null,
+    query: query ? Object.fromEntries(Object.entries(query).sort()) : null,
+  }, (_key, value) => {
+    // Sort object keys at every nesting level for deterministic output
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return Object.fromEntries(Object.entries(value).sort());
+    }
+    return value;
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
 
 const TRUSTED_RECIPIENT_PII_REDACT_RULE_LABEL = "Redact PII outside trusted recipient scope";
 
@@ -401,7 +429,7 @@ export default async function vaultRoutes(fastify: FastifyInstance) {
           connectionId: { type: "string", format: "uuid", description: "Connection to use (required for multi-account services like Google/Microsoft)" },
           service: { type: "string", description: "Service ID for singleton resolution (e.g. 'telegram'). Use instead of connectionId for singleton services." },
           method: { type: "string", enum: ["GET", "POST", "PUT", "DELETE", "PATCH"], description: "HTTP method (Model B only)" },
-          url: { type: "string", format: "uri", description: "Target URL (Model B only)" },
+          url: { type: "string", description: "Target URL (Model B). Full URL for HTTP providers, relative path for protocol providers (e.g., email-imap: /messages?folder=INBOX)." },
           query: { type: "object", additionalProperties: { type: "string" }, description: "Query parameters (Model B)" },
           headers: { type: "object", additionalProperties: { type: "string" }, description: "Request headers (Model B). Authorization, Cookie, Host are stripped." },
           body: { description: "Request body (Model B)" },
@@ -470,11 +498,18 @@ export default async function vaultRoutes(fastify: FastifyInstance) {
       if (!validMethods.includes(body.method)) {
         return reply.code(400).send({ error: `Invalid method: ${body.method}. Must be one of: ${validMethods.join(", ")}` });
       }
-      try {
-        body.url = canonicalizeUrl(body.url);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Invalid URL";
-        return reply.code(400).send({ error: `Invalid URL: ${message}` });
+      // Skip URL canonicalization for relative paths (e.g., /messages, /folders).
+      // Protocol providers like email-imap use virtual paths that aren't HTTP URLs.
+      // The path is prefixed with a synthetic base later in handleModelB.
+      if (body.url.startsWith("/")) {
+        // Relative path — will be prefixed in handleModelB for email-imap
+      } else {
+        try {
+          body.url = canonicalizeUrl(body.url);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Invalid URL";
+          return reply.code(400).send({ error: `Invalid URL: ${message}` });
+        }
       }
     }
 
@@ -2456,6 +2491,11 @@ async function handleModelB(
 
   const originalRequestBody = ctx.requestBody;
 
+  // Fingerprint the normalized request BEFORE any transformations (quarantine,
+  // PII redaction, etc.) so approval redemption can verify the agent re-submitted
+  // the exact same payload. Computed once, used at both creation and validation.
+  const requestFingerprint = computeRequestFingerprint(requestBody, query, headers);
+
   if (sessionKey && requestBody && typeof requestBody === "object") {
     const quarantineRows = await db
       .select({ fragments: promptHistoryQuarantines.fragments })
@@ -2517,26 +2557,30 @@ async function handleModelB(
     });
   }
 
-  // SSRF protection: block requests to private/reserved IP ranges
+  // SSRF protection: block requests to private/reserved IP ranges.
+  // Skip for email-imap connections — they use virtual URLs (email-imap.internal)
+  // and operate via IMAP/SMTP protocols, not HTTP.
   const parsedUrl = new URL(url);
-  const hostSafety = await checkHostSafety(parsedUrl.hostname);
-  request.log.debug(
-    { hostname: parsedUrl.hostname, safe: hostSafety.safe, ...(!hostSafety.safe && { resolvedIp: hostSafety.reason }) },
-    "vault.modelB.ssrf",
-  );
-  if (!hostSafety.safe) {
-    request.log.warn(
-      { hostname: parsedUrl.hostname, reason: hostSafety.reason, agentId: policy.agentId },
-      "vault.modelB.denied.ssrf",
+  if (connection.service !== "email-imap") {
+    const hostSafety = await checkHostSafety(parsedUrl.hostname);
+    request.log.debug(
+      { hostname: parsedUrl.hostname, safe: hostSafety.safe, ...(!hostSafety.safe && { resolvedIp: hostSafety.reason }) },
+      "vault.modelB.ssrf",
     );
-    const { auditId } = logExecutionDenied(sub, policy.agentId, connectionId, {
-      model: "B",
-      method,
-      url,
-      reason: hostSafety.reason,
-    });
+    if (!hostSafety.safe) {
+      request.log.warn(
+        { hostname: parsedUrl.hostname, reason: hostSafety.reason, agentId: policy.agentId },
+        "vault.modelB.denied.ssrf",
+      );
+      const { auditId } = logExecutionDenied(sub, policy.agentId, connectionId, {
+        model: "B",
+        method,
+        url,
+        reason: hostSafety.reason,
+      });
 
-    return reply.code(403).send({ error: hostSafety.reason, auditId });
+      return reply.code(403).send({ error: hostSafety.reason, auditId });
+    }
   }
 
   // Telegram chat ID enforcement: only allow messages to allowlisted chats
@@ -2894,10 +2938,11 @@ async function handleModelB(
       });
     }
 
-    // Verify the approval matches the current request (policy + connection + method + url)
+    // Verify the approval matches the current request (policy + connection + method + url + payload fingerprint)
     const details = existingApproval.requestDetails as {
       method: string;
       url: string;
+      requestFingerprint?: string;
       bypassPiiRedaction?: boolean;
       requestFullFields?: boolean;
     };
@@ -2910,6 +2955,16 @@ async function handleModelB(
       return reply.code(403).send({
         error: "Approval does not match this request",
         hint: "The approvalId was approved for a different request. Submit without approvalId to create a new approval.",
+      });
+    }
+
+    // Verify the request payload (body + query + headers) hasn't been tampered with
+    // since the approval was created. Approvals created before this check was added
+    // won't have a fingerprint — skip validation for those (backwards-compatible).
+    if (details.requestFingerprint && details.requestFingerprint !== requestFingerprint) {
+      return reply.code(403).send({
+        error: "Request payload does not match the approved request",
+        hint: "The request body, query parameters, or headers differ from the original approval request. Submit the identical request that was originally approved, or create a new approval without approvalId.",
       });
     }
 
@@ -2932,12 +2987,14 @@ async function handleModelB(
         request.log.error(err, "Failed to mark approval as consumed");
         throw err;
       });
-    // Scrub sensitive metadata now that the approval is consumed (fire-and-forget)
+    // Scrub sensitive metadata now that the approval is consumed (fire-and-forget).
+    // Preserve method, url, and requestFingerprint for audit trail.
     db.update(approvalRequests)
       .set({
         requestDetails: sql`jsonb_build_object(
           'method', ${approvalRequests.requestDetails}->'method',
-          'url', ${approvalRequests.requestDetails}->'url'
+          'url', ${approvalRequests.requestDetails}->'url',
+          'requestFingerprint', ${approvalRequests.requestDetails}->'requestFingerprint'
         )`,
         updatedAt: new Date(),
       })
@@ -2963,6 +3020,7 @@ async function handleModelB(
     const requestDetails: Record<string, unknown> = {
       method,
       url,
+      requestFingerprint,
       ...(sessionKey && { sessionKey }),
       ...(bypassPiiRedaction && { bypassPiiRedaction: true }),
       ...(requestFullFields && { requestFullFields: true, contactId: fieldStepUpContactId }),
