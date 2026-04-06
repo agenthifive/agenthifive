@@ -1026,10 +1026,8 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
     const tokenData: Record<string, unknown> = {
       email,
       ...(body.displayName && { displayName: body.displayName.trim() }),
-      imap: { host: imapHost, port: imapPort, tls: imapTls },
-      smtp: { host: smtpHost, port: smtpPort, starttls: smtpStarttls },
-      username,
-      password,
+      imap: { host: imapHost, port: imapPort, tls: imapTls, username, password },
+      smtp: { host: smtpHost, port: smtpPort, starttls: smtpStarttls, username, password },
     };
     const tokenPayload = JSON.stringify(tokenData);
     const encryptedTokens = JSON.stringify(encrypt(tokenPayload, getEncryptionKey()));
