@@ -69,15 +69,15 @@
     "access": "public"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.48",
+    "@sinclair/typebox": "^0.34.49",
     "jose": "^5.9.3"
   },
   "peerDependencies": {
-    "openclaw": "^2026.3.22"
+    "openclaw": "^2026.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "openclaw": "^2026.3.22",
+    "openclaw": "^2026.4.5",
     "typescript": "^5.6.0"
   }
 }
