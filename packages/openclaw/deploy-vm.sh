@@ -45,7 +45,7 @@ case "$ENVIRONMENT" in
   ah5|vps)
     AH5_BASE_URL="https://ah5.agenthifive.it"
     AH5_PERSONAL_TOKEN=""
-    AH5_AGENT_ID="a145df5b-a9f5-4434-b454-08a42707c668"
+    AH5_AGENT_ID="b5f3c8e4-fa97-4601-a93d-16d7732494e0"
     ;;
   prod)
     AH5_BASE_URL="https://app.agenthifive.com"
@@ -108,7 +108,7 @@ else
   fi
 
   BOOTSTRAP_SECRET=$(curl -sfL -X POST \
-    "$AH5_BASE_URL/v1/agents/$AH5_AGENT_ID/bootstrap-secret" \
+    "$AH5_BASE_URL/v1/agents/$AH5_AGENT_ID/bootstrap-secret/" \
     -H "Authorization: Bearer $AH5_PERSONAL_TOKEN" \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['bootstrapSecret'])")
   echo "  generated: ${BOOTSTRAP_SECRET:0:10}..."
