@@ -53,6 +53,7 @@ export const PROVIDER_TO_SERVICE: Record<string, string> = {
   openai: "openai",
   gemini: "gemini",
   openrouter: "openrouter",
+  email: "email-imap",
 };
 
 /**

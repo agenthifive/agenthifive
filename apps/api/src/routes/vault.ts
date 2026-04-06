@@ -47,6 +47,7 @@ import {
   type EmailActionMetadata,
 } from "../utils/attachment-metadata";
 import { isTelegramBotUrl, parseTelegramSendPayload, extractTelegramChatId, isTelegramGetUpdatesUrl, filterTelegramUpdates } from "../utils/telegram-message";
+import { handleEmailRequest, type EmailCredentials } from "./email-provider";
 import {
   isSlackApiUrl,
   isSlackReadMethod,
@@ -2431,9 +2432,16 @@ async function handleModelB(
     transparentProxy?: boolean;
   },
 ) {
-  const { sub, connectionId, connection, policy, method, url, query, headers, workspaceId, providerConstraints, approvalId, requestFullFields, sessionKey } = ctx;
+  const { sub, connectionId, connection, policy, method, query, headers, workspaceId, providerConstraints, approvalId, requestFullFields, sessionKey } = ctx;
+  let { url } = ctx;
   const bypassPiiRedaction = ctx.bypassPiiRedaction === true;
   let requestBody = ctx.requestBody;
+
+  // Email uses virtual URLs — agents send relative paths like "/messages?folder=INBOX"
+  // which need a synthetic base for URL parsing and allowlist matching.
+  if (connection.service === "email-imap" && !url.startsWith("http")) {
+    url = `https://email-imap.internal${url.startsWith("/") ? "" : "/"}${url}`;
+  }
 
   // Normalize string body to object — models sometimes pass JSON as a string
   // instead of a parsed object. Without this, chat ID extraction fails (returns null),
@@ -3575,6 +3583,26 @@ export async function executeModelBRequest(
     },
     "vault.exec.credential",
   );
+
+  // Email uses IMAP/SMTP protocols, not HTTP. Delegate to the email provider handler
+  // before entering the HTTP proxy flow (SSRF check, fetch, etc.).
+  if (connection.provider === "email") {
+    const emailCreds = tokenData as unknown as EmailCredentials;
+    if (!emailCreds.imap || !emailCreds.smtp) {
+      return reply.code(500).send({ error: "Email credentials incomplete" });
+    }
+    const result = await handleEmailRequest(method, url, requestBody, emailCreds, connectionId, log ?? fastify.log);
+    const responseJson = JSON.stringify(result.body);
+    logExecutionCompleted(sub, policy.agentId, connectionId, {
+      model: "B",
+      method,
+      path: new URL(url).pathname,
+      responseStatus: result.status,
+      dataSize: Buffer.byteLength(responseJson, "utf8"),
+      provider: connection.provider,
+    });
+    return reply.code(result.status).send(result.body);
+  }
 
   // Get the access token — for Telegram, use bot token; for API key providers, use API key; for OAuth, refresh first
   let accessToken: string;

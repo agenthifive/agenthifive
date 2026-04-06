@@ -38,8 +38,10 @@
     "expo-server-sdk": "^3.15.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.1.0",
+    "imapflow": "^1.2.18",
     "jose": "^5.9.3",
     "libphonenumber-js": "^1.12.37",
+    "mailparser": "^3.9.6",
     "nodemailer": "^8.0.1",
     "oauth4webapi": "^3.3.0",
     "postgres": "^3.4.0",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@huggingface/transformers": "^3.8.1",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20.0.0",
     "@types/nodemailer": "^7.0.11",
     "drizzle-kit": "^0.31.8",

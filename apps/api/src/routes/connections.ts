@@ -11,6 +11,7 @@ import { agents } from "../db/schema/agents";
 import { agentPermissionRequests } from "../db/schema";
 import { encrypt, decrypt, type EncryptedPayload } from "@agenthifive/security";
 import { resolveConnector } from "../utils/oauth-connector-factory";
+import { validateEmailConnection } from "./email-provider";
 import { logConnectionNeedsReauth, logConnectionRevoked } from "../services/audit";
 import { fetchMicrosoftProfile } from "../utils/microsoft-profile";
 import { buildProviderAuthHeaders } from "../utils/provider-auth";
@@ -37,9 +38,18 @@ function maskSecret(value: string): string {
 
 function buildInlineCredentialPreview(
   provider: string,
-  credentialType: "api_key" | "bot_token",
+  credentialType: "api_key" | "bot_token" | "email",
   tokenData: Record<string, unknown>,
 ): InlineCredentialPreview | null {
+  if (credentialType === "email") {
+    const email = typeof tokenData["email"] === "string" ? tokenData["email"] : null;
+    if (!email) return null;
+    return {
+      primaryLabel: "Email",
+      primaryMasked: maskSecret(email),
+    };
+  }
+
   if (credentialType === "bot_token") {
     const botToken = typeof tokenData["botToken"] === "string" ? tokenData["botToken"] : null;
     if (!botToken) return null;
@@ -81,13 +91,14 @@ function decryptInlineCredentialPreview(
 ): InlineCredentialPreview | null {
   if (!encryptedTokens || !getEncryptionKey()) return null;
   const entry = SERVICE_CATALOG[service as ServiceId];
-  if (!entry || (entry.credentialType !== "api_key" && entry.credentialType !== "bot_token")) return null;
+  const inlineTypes = new Set(["api_key", "bot_token", "email"]);
+  if (!entry || !inlineTypes.has(entry.credentialType)) return null;
 
   try {
     const encryptedPayload = JSON.parse(encryptedTokens) as EncryptedPayload;
     const decrypted = decrypt(encryptedPayload, getEncryptionKey());
     const tokenData = JSON.parse(decrypted) as Record<string, unknown>;
-    return buildInlineCredentialPreview(provider, entry.credentialType, tokenData);
+    return buildInlineCredentialPreview(provider, entry.credentialType as "api_key" | "bot_token" | "email", tokenData);
   } catch {
     return null;
   }
@@ -894,6 +905,164 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
     return {
       connection: connection!,
       message: `${body.provider} connection created successfully`,
+    };
+  });
+
+  /**
+   * POST /connections/email
+   * Creates a connection for an email (IMAP/SMTP) provider.
+   * Validates IMAP/SMTP connectivity and stores credentials encrypted.
+   */
+  fastify.post("/connections/email", {
+    schema: {
+      tags: ["Connections"],
+      summary: "Connect email (IMAP/SMTP)",
+      description:
+        "Stores IMAP and SMTP credentials for a generic email account. " +
+        "Credentials are validated by connecting to both servers, then encrypted at rest.",
+      body: {
+        type: "object",
+        required: ["email", "imapHost", "smtpHost", "password"],
+        properties: {
+          email: { type: "string", description: "Email address" },
+          displayName: { type: "string", description: "Sender display name" },
+          imapHost: { type: "string", description: "IMAP server hostname" },
+          imapPort: { type: "number", description: "IMAP server port (default 993)" },
+          imapTls: { type: "boolean", description: "Use TLS for IMAP (default true)" },
+          smtpHost: { type: "string", description: "SMTP server hostname" },
+          smtpPort: { type: "number", description: "SMTP server port (default 587)" },
+          smtpStarttls: { type: "boolean", description: "Use STARTTLS for SMTP (default true)" },
+          username: { type: "string", description: "Login username (defaults to email)" },
+          password: { type: "string", description: "Email password or app password" },
+          label: { type: "string", description: "Display label for the connection" },
+        },
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            connection: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                provider: { type: "string" },
+                service: { type: "string" },
+                label: { type: "string" },
+                status: { type: "string", enum: ["healthy"] },
+              },
+            },
+            message: { type: "string" },
+          },
+        },
+        400: { type: "object", properties: { error: { type: "string" } } },
+        500: { type: "object", properties: { error: { type: "string" } } },
+      },
+    },
+  }, async (request, reply) => {
+    const { wid } = request.user;
+    const body = request.body as {
+      email: string;
+      displayName?: string;
+      imapHost: string;
+      imapPort?: number;
+      imapTls?: boolean;
+      smtpHost: string;
+      smtpPort?: number;
+      smtpStarttls?: boolean;
+      username?: string;
+      password: string;
+      label?: string;
+    };
+
+    if (!body.email || typeof body.email !== "string" || body.email.trim().length === 0) {
+      return reply.code(400).send({ error: "email is required" });
+    }
+    if (!body.imapHost || typeof body.imapHost !== "string" || body.imapHost.trim().length === 0) {
+      return reply.code(400).send({ error: "imapHost is required" });
+    }
+    if (!body.smtpHost || typeof body.smtpHost !== "string" || body.smtpHost.trim().length === 0) {
+      return reply.code(400).send({ error: "smtpHost is required" });
+    }
+    if (!body.password || typeof body.password !== "string" || body.password.trim().length === 0) {
+      return reply.code(400).send({ error: "password is required" });
+    }
+
+    if (!getEncryptionKey()) {
+      return reply500(reply, new Error("Encryption key not configured"), "Encryption key not configured", { request });
+    }
+
+    const email = body.email.trim();
+    const username = body.username?.trim() || email;
+    const password = body.password.trim();
+    const imapHost = body.imapHost.trim();
+    const imapPort = body.imapPort ?? 993;
+    const imapTls = body.imapTls ?? true;
+    const smtpHost = body.smtpHost.trim();
+    const smtpPort = body.smtpPort ?? 587;
+    const smtpStarttls = body.smtpStarttls ?? true;
+
+    const emailCredentials = {
+      email,
+      ...(body.displayName && { displayName: body.displayName.trim() }),
+      imap: { host: imapHost, port: imapPort, tls: imapTls, username, password },
+      smtp: { host: smtpHost, port: smtpPort, starttls: smtpStarttls, username, password },
+    };
+
+    // Validate connection by testing IMAP and SMTP
+    try {
+      const result = await validateEmailConnection(emailCredentials);
+      if (!result.valid) {
+        request.log.debug({ provider: "email", valid: false, error: result.error }, "conn.email.validated");
+        return reply.code(400).send({ error: result.error || "Email connection validation failed" });
+      }
+      request.log.debug({ provider: "email", valid: true }, "conn.email.validated");
+    } catch {
+      return reply.code(400).send({ error: "Could not validate email connection. Please check your credentials and server settings." });
+    }
+
+    const label = body.label ?? `${email} (IMAP/SMTP)`;
+
+    // Encrypt credentials before storage
+    const tokenData: Record<string, unknown> = {
+      email,
+      ...(body.displayName && { displayName: body.displayName.trim() }),
+      imap: { host: imapHost, port: imapPort, tls: imapTls },
+      smtp: { host: smtpHost, port: smtpPort, starttls: smtpStarttls },
+      username,
+      password,
+    };
+    const tokenPayload = JSON.stringify(tokenData);
+    const encryptedTokens = JSON.stringify(encrypt(tokenPayload, getEncryptionKey()));
+
+    const grantedScopes = ["imap", "smtp"];
+
+    const [connection] = await db
+      .insert(connections)
+      .values({
+        provider: "email",
+        service: "email-imap",
+        label,
+        status: "healthy",
+        workspaceId: wid,
+        encryptedTokens,
+        grantedScopes,
+      })
+      .returning({
+        id: connections.id,
+        provider: connections.provider,
+        service: connections.service,
+        label: connections.label,
+        status: connections.status,
+      });
+
+    request.log.info(
+      { connectionId: connection!.id, provider: "email", service: "email-imap", isReauth: false },
+      "conn.created",
+    );
+
+    return {
+      connection: connection!,
+      message: "Email connection created successfully",
     };
   });
 

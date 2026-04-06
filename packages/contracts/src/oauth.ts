@@ -17,6 +17,7 @@ export const OAuthProviderSchema = z.enum([
   "notion",
   "trello",
   "jira",
+  "email",
 ]);
 export type OAuthProvider = z.infer<typeof OAuthProviderSchema>;
 

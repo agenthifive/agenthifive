@@ -19,6 +19,7 @@ export const providerEnum = pgEnum("provider_type", [
   "notion",
   "trello",
   "jira",
+  "email",
 ]);
 
 export const serviceEnum = pgEnum("service", [
@@ -42,6 +43,7 @@ export const serviceEnum = pgEnum("service", [
   "notion",
   "trello",
   "jira",
+  "email-imap",
 ]);
 
 export const executionModelEnum = pgEnum("execution_model", ["A", "B"]);
