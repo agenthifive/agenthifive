@@ -16,6 +16,7 @@ Connections link your external service accounts to AgentHiFive so that AI agents
 | **OAuth** | Browser-based consent | You click "Connect", authorize in the provider's login page, and tokens are stored automatically. |
 | **Bot Token** | Paste a token | You create a bot in the provider's platform, copy the token, and paste it in the dashboard. |
 | **API Key** | Paste a key or token | You get a key from the provider's console and paste it in the dashboard. |
+| **Email** | IMAP/SMTP credentials | You enter your email server settings and password. The vault connects via IMAP/SMTP. |
 
 ## Supported Providers
 
@@ -49,6 +50,12 @@ Connections link your external service accounts to AgentHiFive so that AI agents
 |---------|----------|-------------------|
 | [Telegram Bot](./telegram) | Telegram | Send and receive messages via a bot |
 | [Slack Bot](./slack) | Slack | Read channels, send messages, upload files |
+
+### Email (IMAP/SMTP)
+
+| Service | Provider | What Agents Can Do |
+|---------|----------|-------------------|
+| [Email (IMAP/SMTP)](./email) | Any | List folders, read/search/send/reply/forward emails, manage flags, download attachments |
 
 ### LLM Access (API Key)
 
