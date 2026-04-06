@@ -67,6 +67,20 @@ async function getImapClient(
     secure: creds.tls,
     auth: { user: creds.username, pass: creds.password },
     logger: false,
+    socketTimeout: IDLE_TIMEOUT_MS, // Close socket before it throws uncaught timeout
+    emitLogs: false,
+  });
+
+  // Catch IMAP socket errors so they don't crash the server as uncaught exceptions.
+  // ImapFlow emits 'error' on the underlying socket for timeouts, connection resets, etc.
+  client.on("error", (err: Error) => {
+    log.warn({ connectionId, error: err.message, code: (err as NodeJS.ErrnoException).code }, "email.imap.error");
+    closeClient(connectionId);
+  });
+
+  client.on("close", () => {
+    log.info({ connectionId }, "email.imap.closed");
+    pool.delete(connectionId);
   });
 
   await client.connect();
