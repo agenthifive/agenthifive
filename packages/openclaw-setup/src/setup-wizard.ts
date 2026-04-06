@@ -406,10 +406,15 @@ function getOpenClawCatalogProviderId(provider: string): string {
 /**
  * Set the default model using OpenClaw's public CLI.
  * This updates both the config and existing sessions.
+ *
+ * Maps provider names to OpenClaw's internal IDs (e.g., gemini → google)
+ * since OpenClaw expects `google/gemini-2.5-flash`, not `gemini/gemini-2.5-flash`.
  */
 function updateDefaultModel(defaultModel: string, log: (msg: string) => void): void {
   try {
-    execSync(`openclaw models set ${defaultModel}`, {
+    // Map our provider name to OpenClaw's expected provider ID
+    const openclawModel = defaultModel.replace(/^gemini\//, "google/");
+    execSync(`openclaw models set ${openclawModel}`, {
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf-8",
       timeout: 10_000,
