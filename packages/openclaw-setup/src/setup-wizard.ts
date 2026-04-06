@@ -407,7 +407,7 @@ function getOpenClawCatalogProviderId(provider: string): string {
  * Load the full model catalog from OpenClaw in a single call.
  * Returns the raw JSON output, or null if the command fails.
  */
-function loadOpenClawFullCatalog(log?: (msg: string) => void): string | null {
+function loadOpenClawFullCatalog(): string | null {
   try {
     // Single call to load ALL providers' models. This takes 30-40s because
     // OpenClaw scans every provider. We only call it once and parse per-provider.
@@ -415,33 +415,24 @@ function loadOpenClawFullCatalog(log?: (msg: string) => void): string | null {
       "openclaw models list --all --json",
       { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 60_000 },
     );
-    log?.(`  [catalog] raw output: ${raw.length} bytes, first 80 chars: ${raw.slice(0, 80).replace(/\n/g, "\\n")}`);
     // OpenClaw may emit plugin log lines to stdout both BEFORE and AFTER the JSON.
     // Extract only the JSON object by finding the first "{" and its matching "}".
     const jsonStart = raw.indexOf("{");
-    if (jsonStart === -1) {
-      log?.(`  [catalog] no JSON found in output`);
-      return null;
-    }
+    if (jsonStart === -1) return null;
     const jsonEnd = raw.lastIndexOf("}");
-    if (jsonEnd === -1 || jsonEnd <= jsonStart) {
-      log?.(`  [catalog] no closing brace found`);
-      return null;
-    }
-    const json = raw.slice(jsonStart, jsonEnd + 1);
-    log?.(`  [catalog] extracted JSON: offset ${jsonStart}-${jsonEnd + 1}, length ${json.length}`);
-    return json;
+    if (jsonEnd === -1 || jsonEnd <= jsonStart) return null;
+    return raw.slice(jsonStart, jsonEnd + 1);
   } catch (err) {
     log?.(`  [catalog] command failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
 
-export function resolveProviderModels(proxiedProviders: string[], log?: (msg: string) => void): Record<string, ModelDef[]> {
+export function resolveProviderModels(proxiedProviders: string[]): Record<string, ModelDef[]> {
   const resolved: Record<string, ModelDef[]> = {};
 
   // Load full catalog once (not per-provider)
-  const catalogJson = loadOpenClawFullCatalog(log);
+  const catalogJson = loadOpenClawFullCatalog();
 
   for (const provider of proxiedProviders) {
     const catalogProvider = getOpenClawCatalogProviderId(provider);
@@ -450,16 +441,8 @@ export function resolveProviderModels(proxiedProviders: string[], log?: (msg: st
     if (catalogJson) {
       try {
         models = parseOpenClawModelList(catalogProvider, catalogJson);
-        log?.(`  [catalog] parsed ${catalogProvider}: ${models.length} models`);
-        if (models.length === 0) {
-          // Debug: show what keys exist in the catalog
-          const parsed = JSON.parse(catalogJson) as { models?: Array<{ key?: string }> };
-          const keys = (parsed.models ?? []).map(m => m.key ?? "?").filter(k => k.startsWith(catalogProvider + "/")).slice(0, 3);
-          log?.(`  [catalog] sample keys for "${catalogProvider}": ${keys.length > 0 ? keys.join(", ") : "NONE"}`);
-          models = null;
-        }
-      } catch (err) {
-        log?.(`  [catalog] parse error for ${catalogProvider}: ${err instanceof Error ? err.message : String(err)}`);
+        if (models.length === 0) models = null;
+      } catch {
         models = null;
       }
     }
@@ -1687,8 +1670,8 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
       // Lazy-load models only when the user actually selects this option.
       // This can take 30-40s because `openclaw models list --all` loads every
       // provider's catalog. Show a clear message so the user knows to wait.
-      log("  Loading available models [v2 single-catalog]...");
-      const providerModels = resolveProviderModels(proxiedProviders, log);
+      log("  Loading available models...");
+      const providerModels = resolveProviderModels(proxiedProviders);
 
       // Let the user know if we fell back to the hardcoded list
       for (const provider of proxiedProviders) {
