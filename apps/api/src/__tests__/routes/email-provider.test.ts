@@ -55,20 +55,24 @@ let imapConnectError: Error | null = null;
 let imapSearchResult: number[] = [42, 41, 40];
 /** Control what fetch yields */
 let imapFetchMessages: typeof fakeMessage[] = [fakeMessage];
+const imapInstances: any[] = [];
 
 function resetImapState() {
   imapConnectError = null;
   imapSearchResult = [42, 41, 40];
   imapFetchMessages = [fakeMessage];
+  imapInstances.length = 0;
 }
 
 const mockImapFlowConstructor = mock.fn(function MockImapFlow(this: any, _opts: any) {
   this._usable = true;
   Object.defineProperty(this, "usable", { get: () => this._usable });
+  this.on = mock.fn((_event: string, _handler: (...args: any[]) => void) => this);
   this.connect = mock.fn(async () => {
     if (imapConnectError) throw imapConnectError;
   });
   this.logout = mock.fn(async () => { this._usable = false; });
+  this.close = mock.fn(() => { this._usable = false; });
   this.list = mock.fn(async () => fakeMailboxes);
   this.status = mock.fn(async (_path: string, _opts: any) => ({ messages: 10, unseen: 2 }));
   this.getMailboxLock = mock.fn(async (_folder: string) => ({ release: mock.fn() }));
@@ -101,6 +105,7 @@ const mockImapFlowConstructor = mock.fn(function MockImapFlow(this: any, _opts: 
   this.messageFlagsRemove = mock.fn(async () => {});
   this.mailboxCreate = mock.fn(async () => {});
   this.mailboxDelete = mock.fn(async () => {});
+  imapInstances.push(this);
 });
 
 mock.module("imapflow", {
@@ -324,6 +329,17 @@ describe("email-provider", () => {
       const result = await handleEmailRequest("PUT", "/folders", null, makeCredentials(), CONNECTION_ID, fakeLog);
       assert.equal(result.status, 404);
     });
+
+    it("registers an error listener and force-closes the IMAP client after use", async () => {
+      const result = await handleEmailRequest("GET", "/folders", null, makeCredentials(), CONNECTION_ID, fakeLog);
+
+      assert.equal(result.status, 200);
+      assert.equal(imapInstances.length, 1);
+      assert.equal(imapInstances[0].on.mock.callCount(), 1);
+      assert.deepEqual(imapInstances[0].on.mock.calls[0]!.arguments[0], "error");
+      assert.equal(imapInstances[0].close.mock.callCount(), 1);
+      assert.equal(imapInstances[0].logout.mock.callCount(), 0);
+    });
   });
 
   // =========================================================================
@@ -425,6 +441,10 @@ describe("email-provider", () => {
       const result = await validateEmailConnection(makeCredentials());
       assert.equal(result.valid, true);
       assert.equal(result.error, undefined);
+      assert.equal(imapInstances.length, 1);
+      assert.equal(imapInstances[0].on.mock.callCount(), 1);
+      assert.equal(imapInstances[0].close.mock.callCount(), 1);
+      assert.equal(imapInstances[0].logout.mock.callCount(), 0);
     });
 
     it("returns IMAP auth failure when IMAP connect throws Authentication error", async () => {
