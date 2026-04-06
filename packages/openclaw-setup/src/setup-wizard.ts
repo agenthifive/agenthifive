@@ -422,8 +422,7 @@ function loadOpenClawFullCatalog(): string | null {
     const jsonEnd = raw.lastIndexOf("}");
     if (jsonEnd === -1 || jsonEnd <= jsonStart) return null;
     return raw.slice(jsonStart, jsonEnd + 1);
-  } catch (err) {
-    log?.(`  [catalog] command failed: ${err instanceof Error ? err.message : String(err)}`);
+  } catch {
     return null;
   }
 }
