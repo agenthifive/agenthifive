@@ -331,9 +331,171 @@ describe("Phase 3: Agent Developer Flow", () => {
     assert.equal(res.status, 200, `Gemini LLM proxy should return 200, got ${res.status}`);
   });
 
+  // ── Step-Up Approval (approvals.md) ──────────────────────────────
+
+  it("Step 4: Step-up approval workflow", async () => {
+    if (!agentAccessToken || !fixture?.jwt) {
+      console.log("[phase3] Skipping — missing token or JWT");
+      return;
+    }
+
+    const jwt = fixture.jwt;
+    const agentId =
+      ((globalThis as Record<string, unknown>).__phase3_agentId as string) ||
+      fixture.agentId;
+
+    // Use the Gemini connection (API key — doesn't expire like OAuth tokens)
+    const connRes = await fetch(`${API_URL}/v1/connections`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    const connData = (await connRes.json()) as Record<string, unknown>;
+    const connections = (connData.connections as Array<Record<string, unknown>>) || [];
+    const geminiConn = connections.find((c) => c.service === "gemini");
+
+    if (!geminiConn) {
+      console.log("[phase3] Skipping approval test — no Gemini connection");
+      return;
+    }
+
+    const geminiConnId = geminiConn.id as string;
+
+    // 1. Delete any existing permissive policies for this agent + connection
+    //    (Step 3b created one with stepUpApproval: "never")
+    const existingPolicies = await fetch(`${API_URL}/v1/policies`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    if (existingPolicies.ok) {
+      const pData = (await existingPolicies.json()) as { policies: Array<{ id: string; agentId: string; connectionId: string }> };
+      for (const p of pData.policies || []) {
+        if (p.agentId === agentId && p.connectionId === geminiConnId) {
+          await fetch(`${API_URL}/v1/policies/${p.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${jwt}` },
+          });
+          console.log(`[phase3] Deleted existing policy: ${p.id}`);
+        }
+      }
+    }
+
+    // Create a policy with stepUpApproval: "always"
+    const policyRes = await fetch(`${API_URL}/v1/policies`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        agentId,
+        connectionId: geminiConnId,
+        allowedModels: ["B"],
+        defaultMode: "read_write",
+        stepUpApproval: "always",
+        allowlists: [{
+          baseUrl: "https://generativelanguage.googleapis.com",
+          methods: ["GET", "POST"],
+          pathPatterns: ["/**"],
+        }],
+      }),
+    });
+
+    if (!policyRes.ok) {
+      console.log(`[phase3] Approval policy creation failed: ${policyRes.status}`);
+      return;
+    }
+    const policy = (await policyRes.json()) as { policy: { id: string } };
+    const approvalPolicyId = policy.policy.id;
+    console.log(`[phase3] Created approval policy: ${approvalPolicyId}`);
+
+    // 2. Execute a vault request → should get 202 (approval required)
+    const execRes = await fetch(`${API_URL}/v1/vault/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentAccessToken}`,
+      },
+      body: JSON.stringify({
+        model: "B",
+        connectionId: geminiConnId,
+        method: "GET",
+        url: "https://generativelanguage.googleapis.com/v1beta/models",
+      }),
+    });
+
+    const execData = (await execRes.json()) as {
+      approvalRequired?: boolean;
+      approvalRequestId?: string;
+      reason?: string;
+      expiresAt?: string;
+    };
+
+    console.log(`[phase3] Vault execute with approval: ${execRes.status}`);
+
+    assert.equal(execRes.status, 202, `Should return 202 (approval required), got ${execRes.status}`);
+    assert.ok(execData.approvalRequired, "Response should have approvalRequired: true");
+    assert.ok(execData.approvalRequestId, "Response should have approvalRequestId");
+    assert.ok(execData.expiresAt, "Response should have expiresAt");
+
+    const approvalRequestId = execData.approvalRequestId!;
+    console.log(`[phase3] Approval request: ${approvalRequestId}`);
+    console.log(`[phase3] Reason: ${execData.reason}`);
+
+    // 3. Approve the request (as the workspace owner)
+    const approveRes = await fetch(
+      `${API_URL}/v1/approvals/${approvalRequestId}/approve`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+      },
+    );
+
+    const approveData = (await approveRes.json()) as {
+      approved?: boolean;
+      approvalRequestId?: string;
+      auditId?: string;
+    };
+
+    console.log(`[phase3] Approve: ${approveRes.status} ${JSON.stringify(approveData).slice(0, 200)}`);
+    assert.equal(approveRes.status, 200, `Approve should return 200, got ${approveRes.status}: ${JSON.stringify(approveData).slice(0, 200)}`);
+    assert.ok(approveData.approved, "Response should have approved: true");
+
+    // 4. Re-execute with the approvalId → should succeed
+    const reExecRes = await fetch(`${API_URL}/v1/vault/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentAccessToken}`,
+      },
+      body: JSON.stringify({
+        model: "B",
+        connectionId: geminiConnId,
+        method: "GET",
+        url: "https://generativelanguage.googleapis.com/v1beta/models",
+        approvalId: approvalRequestId,
+      }),
+    });
+
+    const reExecData = (await reExecRes.json()) as Record<string, unknown>;
+    console.log(`[phase3] Re-execute with approval: ${reExecRes.status}`);
+
+    assert.equal(
+      reExecRes.status, 200,
+      `Re-execute with approval should return 200, got ${reExecRes.status}: ${JSON.stringify(reExecData).slice(0, 150)}`,
+    );
+    console.log("[phase3] Step-up approval: full flow succeeded (request → 202 → approve → re-execute → 200)");
+
+    // 5. Clean up — delete the approval policy so it doesn't interfere
+    await fetch(`${API_URL}/v1/policies/${approvalPolicyId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    console.log("[phase3] Cleaned up approval policy");
+  });
+
   // ── Audit Log (audit.md) ────────────────────────────────────────
 
-  it("Step 4: Verify audit trail", async () => {
+  it("Step 5: Verify audit trail", async () => {
     if (!fixture?.jwt) {
       console.log("[phase3] Skipping — no user JWT for audit query");
       return;
