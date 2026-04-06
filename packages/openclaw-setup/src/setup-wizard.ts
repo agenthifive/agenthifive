@@ -416,21 +416,21 @@ function loadOpenClawFullCatalog(log?: (msg: string) => void): string | null {
       { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8", timeout: 60_000 },
     );
     log?.(`  [catalog] raw output: ${raw.length} bytes, first 80 chars: ${raw.slice(0, 80).replace(/\n/g, "\\n")}`);
-    // OpenClaw may emit plugin log lines (e.g., "[plugins] AgentHiFive v0.4.6 ready")
-    // to stdout before the JSON. Find the first line starting with "{" to get the JSON.
-    const jsonStart = raw.indexOf("\n{");
-    if (jsonStart !== -1) {
-      const json = raw.slice(jsonStart + 1);
-      log?.(`  [catalog] found JSON at offset ${jsonStart + 1}, length ${json.length}`);
-      return json;
+    // OpenClaw may emit plugin log lines to stdout both BEFORE and AFTER the JSON.
+    // Extract only the JSON object by finding the first "{" and its matching "}".
+    const jsonStart = raw.indexOf("{");
+    if (jsonStart === -1) {
+      log?.(`  [catalog] no JSON found in output`);
+      return null;
     }
-    // If the output starts with "{", it's pure JSON
-    if (raw.trimStart().startsWith("{")) {
-      log?.(`  [catalog] output is pure JSON`);
-      return raw.trimStart();
+    const jsonEnd = raw.lastIndexOf("}");
+    if (jsonEnd === -1 || jsonEnd <= jsonStart) {
+      log?.(`  [catalog] no closing brace found`);
+      return null;
     }
-    log?.(`  [catalog] no JSON found in output`);
-    return null;
+    const json = raw.slice(jsonStart, jsonEnd + 1);
+    log?.(`  [catalog] extracted JSON: offset ${jsonStart}-${jsonEnd + 1}, length ${json.length}`);
+    return json;
   } catch (err) {
     log?.(`  [catalog] command failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
