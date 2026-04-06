@@ -131,6 +131,28 @@ Create comment:
   POST https://api.notion.com/v1/comments
   body: { parent: { page_id: "..." }, rich_text: [{ text: { content: "..." } }] }`,
 
+  "email-imap": `### Email IMAP/SMTP (provider: email-imap)
+
+Connect to any email server via IMAP/SMTP. Use vault_execute with service: email-imap or connectionId.
+
+List folders:
+  GET /folders
+
+List messages:
+  GET /messages?folder=INBOX&limit=10
+
+Search messages:
+  GET /messages?q=from:bob subject:meeting
+
+Read message:
+  GET /messages/{uid}?folder=INBOX
+
+Send email:
+  POST /messages/send
+  body: { to: "alice@example.com", subject: "Hello", textBody: "Message content" }
+
+Search operators: from:, to:, subject:, body:, unseen, seen, flagged, has:attachment, since:YYYY-MM-DD, before:YYYY-MM-DD`,
+
   microsoft: `### Microsoft Graph — Mail (provider: microsoft)
 
 List messages:
@@ -246,7 +268,9 @@ const SECTION_ACTION_TEMPLATES = `## Action Template IDs
 | \`trello-read\` | Trello | Read boards, lists, cards, and labels |
 | \`trello-manage\` | Trello | Read, create, update cards and lists |
 | \`jira-read\` | Jira | Search and read issues, projects, and comments |
-| \`jira-manage\` | Jira | Read, create, update issues and comments |`;
+| \`jira-manage\` | Jira | Read, create, update issues and comments |
+| \`email-imap-read\` | Email (IMAP) | Read messages, list folders, search |
+| \`email-imap-manage\` | Email (IMAP) | Read, send, reply, forward, move, delete messages |`;
 
 const SECTION_SERVICE_DISCOVERY = `## When the User Asks About a Service
 
@@ -623,6 +647,46 @@ Use \`connectionId\` from \`vault_connections_list\`. Trello is NOT a singleton 
 - Add comment: \`POST https://api.trello.com/1/cards/{cardId}/actions/comments\` — body: \`{ text }\`
 - Create list: \`POST https://api.trello.com/1/lists\` — body: \`{ name, idBoard }\`
 - Update list: \`PUT https://api.trello.com/1/lists/{listId}\` — body: \`{ name }\``,
+
+  "email-imap": `### Email IMAP/SMTP (provider: email-imap, multi-account — use connectionId)
+
+Connect to any email server via IMAP/SMTP. Use \`connectionId\` from \`vault_connections_list\` (or \`service: "email-imap"\` if only one connection exists).
+The vault handles IMAP/SMTP authentication automatically — never provide server credentials yourself.
+
+**Read operations (GET):**
+- List folders: \`GET /folders\` — returns all email folders with message counts
+- List messages: \`GET /messages?folder=INBOX&limit=10\` — paginated, newest first
+- Search messages: \`GET /messages?q=from:bob subject:meeting\` — search with operators (see below)
+- Read message: \`GET /messages/{uid}?folder=INBOX\` — returns text, HTML body, and attachment metadata
+- Download attachment: \`GET /messages/{uid}/attachments/{partId}?folder=INBOX\` — returns attachment content
+
+**Write operations (POST/PATCH/DELETE):**
+- Send email: \`POST /messages/send\` — body: \`{ "to": "alice@example.com", "subject": "Hello", "textBody": "Message content" }\`
+- Reply: \`POST /messages/{uid}/reply?folder=INBOX\` — body: \`{ "textBody": "Reply text", "replyAll": false }\`
+- Forward: \`POST /messages/{uid}/forward?folder=INBOX\` — body: \`{ "to": "bob@example.com", "textBody": "FYI" }\`
+- Move message: \`POST /messages/{uid}/move?folder=INBOX\` — body: \`{ "destination": "Archive" }\`
+- Delete message: \`DELETE /messages/{uid}?folder=INBOX\`
+- Update flags: \`PATCH /messages/{uid}/flags?folder=INBOX\` — body: \`{ "add": ["\\\\Seen"], "remove": ["\\\\Flagged"] }\`
+
+**Search operators** (combine in the \`q\` parameter):
+\`from:\`, \`to:\`, \`subject:\`, \`body:\`, \`unseen\`, \`seen\`, \`flagged\`, \`has:attachment\`, \`since:YYYY-MM-DD\`, \`before:YYYY-MM-DD\`
+
+**Example vault_execute calls:**
+
+List recent inbox messages:
+\`\`\`json
+vault_execute({ "connectionId": "<id>", "method": "GET", "url": "/messages?folder=INBOX&limit=5" })
+\`\`\`
+
+Search for unread messages with attachments:
+\`\`\`json
+vault_execute({ "connectionId": "<id>", "method": "GET", "url": "/messages?q=unseen has:attachment&folder=INBOX" })
+\`\`\`
+
+Send a new email:
+\`\`\`json
+vault_execute({ "connectionId": "<id>", "method": "POST", "url": "/messages/send", "body": { "to": "alice@example.com", "subject": "Project update", "textBody": "Here is the latest status..." } })
+\`\`\``,
 
   jira: `### Jira Cloud REST API v3
 
