@@ -1422,6 +1422,136 @@ describe("Vault Execute - Model B (Brokered Proxy) [DB Integrated]", () => {
     assert.ok(res2.json().error.includes("expired"));
   });
 
+  it("rejects approvalId when request body has been tampered with", async () => {
+    await db.update(policies).set({
+      stepUpApproval: "always",
+    }).where(eq(policies.id, testPolicyId));
+
+    // First request with a specific body — gets 202
+    const res1 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: {
+        model: "B",
+        connectionId: testConnectionId,
+        method: "POST",
+        url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        body: { raw: "original-base64-payload" },
+      },
+    });
+
+    assert.equal(res1.statusCode, 202);
+    const { approvalRequestId } = res1.json();
+
+    await db.update(approvalRequests)
+      .set({ status: "approved", updatedAt: new Date() })
+      .where(eq(approvalRequests.id, approvalRequestId));
+
+    // Re-submit with DIFFERENT body — should be rejected
+    const res2 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: {
+        model: "B",
+        connectionId: testConnectionId,
+        method: "POST",
+        url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        body: { raw: "tampered-payload" },
+        approvalId: approvalRequestId,
+      },
+    });
+
+    assert.equal(res2.statusCode, 403, `Expected 403 but got ${res2.statusCode}: ${JSON.stringify(res2.json())}`);
+    assert.ok(res2.json().error.includes("payload does not match"));
+  });
+
+  it("rejects approvalId when query params have been tampered with", async () => {
+    await db.update(policies).set({
+      stepUpApproval: "always",
+    }).where(eq(policies.id, testPolicyId));
+
+    // First request with specific query params — gets 202
+    const res1 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: {
+        model: "B",
+        connectionId: testConnectionId,
+        method: "GET",
+        url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/123",
+        query: { format: "metadata" },
+      },
+    });
+
+    assert.equal(res1.statusCode, 202, `Expected 202 but got ${res1.statusCode}: ${JSON.stringify(res1.json())}`);
+    const { approvalRequestId } = res1.json();
+
+    await db.update(approvalRequests)
+      .set({ status: "approved", updatedAt: new Date() })
+      .where(eq(approvalRequests.id, approvalRequestId));
+
+    // Re-submit with DIFFERENT query params — should be rejected
+    const res2 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: {
+        model: "B",
+        connectionId: testConnectionId,
+        method: "GET",
+        url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/123",
+        query: { format: "full" },
+        approvalId: approvalRequestId,
+      },
+    });
+
+    assert.equal(res2.statusCode, 403, `Expected 403 but got ${res2.statusCode}: ${JSON.stringify(res2.json())}`);
+    assert.ok(res2.json().error.includes("payload does not match"));
+  });
+
+  it("accepts approvalId when request is identical (body + query + headers)", async () => {
+    await db.update(policies).set({
+      stepUpApproval: "always",
+    }).where(eq(policies.id, testPolicyId));
+
+    const sharedPayload = {
+      model: "B",
+      connectionId: testConnectionId,
+      method: "POST",
+      url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      body: { raw: "identical-base64-payload", nested: { key: "value" } },
+      query: { uploadType: "multipart" },
+    };
+
+    // First request — gets 202
+    const res1 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: sharedPayload,
+    });
+
+    assert.equal(res1.statusCode, 202);
+    const { approvalRequestId } = res1.json();
+
+    await db.update(approvalRequests)
+      .set({ status: "approved", updatedAt: new Date() })
+      .where(eq(approvalRequests.id, approvalRequestId));
+
+    // Re-submit with IDENTICAL payload — should succeed
+    const res2 = await app.inject({
+      method: "POST",
+      url: "/vault/execute",
+      headers: { authorization: `Bearer ${testToken}` },
+      payload: { ...sharedPayload, approvalId: approvalRequestId },
+    });
+
+    assert.equal(res2.statusCode, 200, `Expected 200 but got ${res2.statusCode}: ${JSON.stringify(res2.json())}`);
+  });
+
   it("enforces Model B rate limits", async () => {
     await db.update(policies).set({
       rateLimits: { maxRequestsPerHour: 1 },
@@ -2328,10 +2458,10 @@ describe("Vault Execute - OpenAI & Gemini LLM Providers [DB Integrated]", () => 
     const [consumedApproval] = await db.select().from(approvalRequests)
       .where(eq(approvalRequests.id, firstBody.approvalRequestId));
     assert.equal(consumedApproval?.status, "consumed");
-    assert.deepEqual(consumedApproval?.requestDetails, {
-      method: "POST",
-      url: proxyUrl,
-    });
+    const scrubbedDetails = consumedApproval?.requestDetails as Record<string, unknown>;
+    assert.equal(scrubbedDetails?.method, "POST");
+    assert.equal(scrubbedDetails?.url, proxyUrl);
+    assert.ok(scrubbedDetails?.requestFingerprint, "Scrubbed details should preserve requestFingerprint");
   });
 
   it("quarantines prior TUI-wrapped prompt-injection text even if replay formatting changes", async () => {

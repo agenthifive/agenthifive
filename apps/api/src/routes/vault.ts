@@ -2961,7 +2961,12 @@ async function handleModelB(
     // Verify the request payload (body + query + headers) hasn't been tampered with
     // since the approval was created. Approvals created before this check was added
     // won't have a fingerprint — skip validation for those (backwards-compatible).
-    if (details.requestFingerprint && details.requestFingerprint !== requestFingerprint) {
+    // Skip for LLM proxy requests (transparent proxy or session-based vault execute)
+    // where the body legitimately changes between approval and replay because the
+    // conversation progresses with new messages. LLM replay security is handled by
+    // the prompt history quarantine system instead.
+    const isLlmReplay = ctx.transparentProxy || Boolean(sessionKey);
+    if (!isLlmReplay && details.requestFingerprint && details.requestFingerprint !== requestFingerprint) {
       return reply.code(403).send({
         error: "Request payload does not match the approved request",
         hint: "The request body, query parameters, or headers differ from the original approval request. Submit the identical request that was originally approved, or create a new approval without approvalId.",

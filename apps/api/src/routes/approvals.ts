@@ -18,7 +18,8 @@ function scrubRequestDetails(approvalId: string) {
     .set({
       requestDetails: sql`jsonb_build_object(
         'method', ${approvalRequests.requestDetails}->'method',
-        'url', ${approvalRequests.requestDetails}->'url'
+        'url', ${approvalRequests.requestDetails}->'url',
+        'requestFingerprint', ${approvalRequests.requestDetails}->'requestFingerprint'
       )`,
       updatedAt: new Date(),
     })
