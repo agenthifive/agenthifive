@@ -26,13 +26,14 @@ export const SERVICE_IDS = [
   "notion",
   "trello",
   "jira",
+  "email-imap",
 ] as const;
 
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
 export type ServiceCategory = "llm" | "communication" | "data";
 
-export type CredentialType = "oauth" | "api_key" | "bot_token";
+export type CredentialType = "oauth" | "api_key" | "bot_token" | "email";
 
 /** Ordered list of categories (controls tab rendering order) */
 export const SERVICE_CATEGORIES: ServiceCategory[] = ["llm", "communication", "data"];
@@ -404,6 +405,19 @@ export const SERVICE_CATALOG: Record<ServiceId, ServiceCatalogEntry> = {
     credentialType: "api_key",
     allowedModels: ["B"],
     docsPath: "/connections/jira",
+    scopes: [],
+  },
+  // ── Email (IMAP/SMTP) ──────────────────────────────────
+  "email-imap": {
+    provider: "email",
+    displayName: "Email (IMAP/SMTP)",
+    icon: "📧",
+    description: "Connect to any email server via IMAP and SMTP",
+    group: "Email",
+    category: "data",
+    singleton: false,
+    credentialType: "email",
+    allowedModels: ["B"],
     scopes: [],
   },
 };

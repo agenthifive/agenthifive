@@ -1017,6 +1017,27 @@ export const SERVICE_DEFAULT_ALLOWLISTS: Record<string, AllowlistEntry[]> = {
   jira: [
     { baseUrl: "https://*.atlassian.net", methods: ["GET", "POST", "PUT", "DELETE"], pathPatterns: ["/rest/api/3/*"] },
   ],
+
+  // ── Email (IMAP/SMTP — virtual REST endpoints) ──
+  "email-imap": [
+    {
+      baseUrl: "https://email-imap.internal",
+      methods: ["GET", "POST", "DELETE", "PATCH"],
+      pathPatterns: [
+        "/folders",
+        "/folders/*",
+        "/messages",
+        "/messages/*",
+        "/messages/send",
+        "/messages/*/reply",
+        "/messages/*/forward",
+        "/messages/*/move",
+        "/messages/*/copy",
+        "/messages/*/flags",
+        "/messages/*/attachments/*",
+      ],
+    },
+  ],
 };
 
 /** Returns default allowlists for a service, or empty array if unknown. */
