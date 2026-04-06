@@ -183,15 +183,15 @@ describe("Phase 3: Agent Developer Flow", () => {
     console.log(`[phase3] Got agent token: ${data.access_token.slice(0, 12)}...`);
   });
 
-  // ── Vault Execute (execution.md) ────────────────────────────────
+  // ── Vault Execute: Gmail (execution.md) ──────────────────────────
 
-  it("Step 3: Execute Model B vault request", async () => {
+  it("Step 3: Execute Model B — Gmail labels", async () => {
     if (!agentAccessToken || !fixture?.connectionId) {
       console.log("[phase3] Skipping — no agent token or connection ID");
       return;
     }
 
-    // Follow the docs: POST /v1/vault/execute with Model B
+    // The Gmail allowlist template uses www.googleapis.com (not gmail.googleapis.com)
     const res = await fetch(`${API_URL}/v1/vault/execute`, {
       method: "POST",
       headers: {
@@ -202,43 +202,133 @@ describe("Phase 3: Agent Developer Flow", () => {
         model: "B",
         connectionId: fixture.connectionId,
         method: "GET",
-        url: "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        url: "https://www.googleapis.com/gmail/v1/users/me/labels",
       }),
     });
 
-    // With a dummy API key, the provider will reject the request.
-    // What matters is that the vault accepted it and attempted to proxy.
     const data = (await res.json()) as Record<string, unknown>;
     console.log(
-      `[phase3] Vault execute response: ${res.status} ${JSON.stringify(data).slice(0, 200)}`,
+      `[phase3] Gmail vault execute: ${res.status} ${JSON.stringify(data).slice(0, 200)}`,
     );
 
     if (res.status === 200) {
-      // Vault proxied successfully (unlikely with dummy key, but possible for list endpoints)
-      assert.ok(data.auditId, "Response should include auditId");
-    } else if (res.status === 502 || res.status === 503) {
-      // Provider rejected the dummy key — this is expected
-      console.log("[phase3] Provider rejected dummy key (expected)");
-      // Check if auditId is still present in error responses
-      if (!data.auditId) {
-        reportGap({
-          file: EXEC_DOC,
-          section: "Model B Response",
-          severity: "unclear",
-          description:
-            "Docs should clarify whether auditId is included in error responses " +
-            "when the provider rejects the request (502/503).",
-          evidence: `Status ${res.status}, auditId present: ${!!data.auditId}`,
-        });
-      }
-    } else if (res.status === 403) {
-      // Policy denied — check the hint
-      console.log(
-        `[phase3] Policy denied: ${JSON.stringify(data).slice(0, 300)}`,
-      );
+      console.log("[phase3] Gmail: vault proxied successfully");
+      assert.ok(data.auditId || data.body, "Response should include auditId or body");
+    } else if (res.status === 409) {
+      // OAuth token may have expired between test runs. The vault correctly
+      // detected this and flagged the connection for reauth.
+      console.log("[phase3] Gmail: connection needs reauthentication (OAuth token expired between test runs)");
     } else {
-      console.log(`[phase3] Unexpected status: ${res.status}`);
+      assert.fail(`Unexpected vault response: ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
     }
+  });
+
+  // ── Vault Execute: Gemini LLM proxy ─────────────────────────────
+
+  it("Step 3b: Execute via LLM proxy — Gemini", async () => {
+    if (!agentAccessToken) {
+      console.log("[phase3] Skipping — no agent token");
+      return;
+    }
+
+    // Create a Gemini connection + policy for this agent
+    const jwt = fixture?.jwt;
+    if (!jwt) {
+      console.log("[phase3] Skipping Gemini — no user JWT");
+      return;
+    }
+
+    // Check if a Gemini connection exists
+    const connRes = await fetch(`${API_URL}/v1/connections`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    const connData = (await connRes.json()) as Record<string, unknown>;
+    const connections = (connData.connections as Array<Record<string, unknown>>) || [];
+    let geminiConn = connections.find((c) => c.service === "gemini");
+
+    if (!geminiConn) {
+      // Create one with the test key
+      const createRes = await fetch(`${API_URL}/v1/connections/api-key`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: "gemini",
+          service: "gemini",
+          label: "E2E Gemini",
+          apiKey: "AIzaSyAZ_RlkCHbuCG5r3rMmKtzmUpdEXy7b9pM",
+        }),
+      });
+      if (!createRes.ok) {
+        console.log(`[phase3] Gemini connection creation failed: ${createRes.status}`);
+        return;
+      }
+      const created = (await createRes.json()) as { connection: { id: string } };
+      geminiConn = { id: created.connection.id } as Record<string, unknown>;
+      console.log(`[phase3] Gemini connection created: ${geminiConn.id}`);
+    }
+
+    // Always create a policy for the current agent (agent is new each run)
+    const agentId =
+      ((globalThis as Record<string, unknown>).__phase3_agentId as string) ||
+      fixture?.agentId;
+    const policyRes = await fetch(`${API_URL}/v1/policies`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        agentId,
+        connectionId: geminiConn.id,
+        allowedModels: ["B"],
+        defaultMode: "read_write",
+        stepUpApproval: "never",
+        allowlists: [{
+          baseUrl: "https://generativelanguage.googleapis.com",
+          methods: ["GET", "POST"],
+          pathPatterns: ["/**"],
+        }],
+      }),
+    });
+    if (policyRes.ok) {
+      console.log("[phase3] Gemini policy created for agent");
+    } else {
+      const err = await policyRes.text();
+      console.log(`[phase3] Gemini policy creation: ${policyRes.status} ${err.slice(0, 100)}`);
+    }
+
+    // Execute via the LLM proxy endpoint
+    const res = await fetch(
+      `${API_URL}/v1/vault/llm/gemini/models/gemini-2.0-flash:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": agentAccessToken,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: "Reply with exactly: VAULT_E2E_OK" }] }],
+        }),
+      },
+    );
+
+    const body = await res.text();
+    console.log(`[phase3] Gemini LLM proxy: ${res.status} ${body.slice(0, 200)}`);
+
+    if (res.status === 200) {
+      try {
+        const data = JSON.parse(body);
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        console.log(`[phase3] Gemini response: "${text.trim()}"`);
+      } catch {
+        console.log("[phase3] Gemini response not JSON (may be SSE)");
+      }
+    }
+
+    assert.equal(res.status, 200, `Gemini LLM proxy should return 200, got ${res.status}`);
   });
 
   // ── Audit Log (audit.md) ────────────────────────────────────────

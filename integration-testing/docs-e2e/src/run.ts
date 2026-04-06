@@ -116,6 +116,16 @@ async function main() {
     allPassed = false;
   }
 
+  // Phase 4: OpenClaw integration (optional — requires openclaw installed)
+  try {
+    execSync("openclaw --version", { stdio: "ignore" });
+    if (!runPhase("04-openclaw-integration.test.ts")) {
+      allPassed = false;
+    }
+  } catch {
+    console.log("\n[docs-e2e] Skipping Phase 4 (OpenClaw not installed)");
+  }
+
   // Print documentation gap report
   printReport();
 
