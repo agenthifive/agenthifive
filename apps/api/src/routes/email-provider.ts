@@ -34,6 +34,18 @@ interface AddressObject {
   address: string;
 }
 
+const consoleLogger = {
+  level: "silent",
+  silent: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+  trace: () => {},
+  fatal: () => {},
+  child: () => consoleLogger,
+} as FastifyBaseLogger;
+
 // ---------------------------------------------------------------------------
 // IMAP Connection — connect per request, no pooling
 // ---------------------------------------------------------------------------
@@ -46,12 +58,12 @@ interface AddressObject {
  * and crash the server. The 1-2s TLS handshake overhead per request is
  * acceptable for the safety guarantee.
  *
- * The caller MUST call client.logout() when done (use try/finally).
+ * The caller MUST call client.close() when done (use try/finally).
  */
-async function connectImap(
+function createImapClient(
   creds: EmailCredentials["imap"],
   log: FastifyBaseLogger,
-): Promise<ImapFlow> {
+): ImapFlow {
   const client = new ImapFlow({
     host: creds.host,
     port: creds.port,
@@ -60,6 +72,18 @@ async function connectImap(
     logger: false,
   });
 
+  client.on("error", (err) => {
+    log.warn({ err }, "email.imap.client_error");
+  });
+
+  return client;
+}
+
+async function connectImap(
+  creds: EmailCredentials["imap"],
+  log: FastifyBaseLogger,
+): Promise<ImapFlow> {
+  const client = createImapClient(creds, log);
   await client.connect();
   return client;
 }
@@ -156,9 +180,11 @@ export async function handleEmailRequest(
   } catch (err) {
     return classifyEmailError(err, connectionId, method, path, log);
   } finally {
-    // Always disconnect — no pooling, no lingering sockets
+    // Always tear down the socket immediately — no pooling, no lingering listeners.
     if (client) {
-      client.logout().catch(() => {});
+      try {
+        client.close();
+      } catch {}
     }
   }
 }
@@ -663,16 +689,10 @@ async function handleUpdateFlags(
 export async function validateEmailConnection(credentials: EmailCredentials): Promise<{ valid: boolean; error?: string }> {
   // Test IMAP
   try {
-    const client = new ImapFlow({
-      host: credentials.imap.host,
-      port: credentials.imap.port,
-      secure: credentials.imap.tls,
-      auth: { user: credentials.imap.username, pass: credentials.imap.password },
-      logger: false,
-    });
+    const client = createImapClient(credentials.imap, consoleLogger);
     await client.connect();
     await client.list();
-    await client.logout();
+    client.close();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("Authentication") || msg.includes("LOGIN")) {
@@ -702,4 +722,3 @@ export async function validateEmailConnection(credentials: EmailCredentials): Pr
 
   return { valid: true };
 }
-
