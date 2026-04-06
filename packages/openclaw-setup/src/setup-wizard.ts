@@ -10,7 +10,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { generateKeyPair, exportJWK } from "jose";
@@ -404,43 +404,18 @@ function getOpenClawCatalogProviderId(provider: string): string {
 }
 
 /**
- * Update existing OpenClaw sessions to use the new default model.
- *
- * OpenClaw persists the selected model per-session in
- * ~/.openclaw/agents/main/sessions/sessions.json. When the user changes
- * the default model via the setup CLI, existing sessions would still use
- * the old model. This function updates all sessions to the new model so
- * the change takes effect immediately without needing `/models` or `/new`.
+ * Set the default model using OpenClaw's public CLI.
+ * This updates both the config and existing sessions.
  */
-function updateSessionModels(configPath: string, defaultModel: string, log: (msg: string) => void): void {
+function updateDefaultModel(defaultModel: string, log: (msg: string) => void): void {
   try {
-    const configDir = path.dirname(configPath);
-    // The sessions file lives relative to the OpenClaw config directory
-    const sessionsPath = path.join(configDir, "agents", "main", "sessions", "sessions.json");
-    if (!existsSync(sessionsPath)) return;
-
-    const raw = readFileSync(sessionsPath, "utf-8");
-    const sessions = JSON.parse(raw) as Record<string, Record<string, unknown>>;
-
-    // Extract model ID from "provider/model" format
-    const modelId = defaultModel.includes("/") ? defaultModel.split("/").slice(1).join("/") : defaultModel;
-    let updated = 0;
-
-    for (const [key, session] of Object.entries(sessions)) {
-      if (session && typeof session === "object" && "model" in session) {
-        if (session.model !== modelId) {
-          session.model = modelId;
-          updated++;
-        }
-      }
-    }
-
-    if (updated > 0) {
-      writeFileSync(sessionsPath, JSON.stringify(sessions, null, 2) + "\n", "utf-8");
-      log(`  Updated ${updated} existing session(s) to use ${defaultModel}`);
-    }
+    execSync(`openclaw models set ${defaultModel}`, {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf-8",
+      timeout: 10_000,
+    });
   } catch {
-    // Non-critical — sessions will pick up the default on next /new
+    // Non-critical — config was already updated, this just syncs sessions
   }
 }
 
@@ -1622,7 +1597,7 @@ async function runChangeModel(opts: SetupOptions): Promise<void> {
   const merged = mergePluginConfig(existing, agentsUpdate);
 
   writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
-  updateSessionModels(configPath, defaultModel, log);
+  updateDefaultModel(defaultModel, log);
 
   log("");
   log(`  Default model updated to: ${defaultModel}`);
@@ -1735,7 +1710,7 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
       const merged = mergePluginConfig(existingConfig, agentsUpdate);
 
       writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
-      updateSessionModels(configPath, defaultModel, log);
+      updateDefaultModel(defaultModel, log);
 
       log("");
       log(`  Default model updated to: ${defaultModel}`);
