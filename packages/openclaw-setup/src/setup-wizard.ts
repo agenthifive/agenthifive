@@ -1585,6 +1585,9 @@ async function runChangeModel(opts: SetupOptions): Promise<void> {
   log("");
   log(`  Default model updated to: ${defaultModel}`);
   log(`  Config saved: ${configPath}`);
+  log("");
+  log("  Note: existing TUI sessions keep their current model.");
+  log("  Use /models in the TUI or start a new session (/new) to use the new default.");
 
   logDone(log, defaultModel, proxiedProviders);
 }
@@ -1669,7 +1672,7 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
       // Lazy-load models only when the user actually selects this option.
       // This can take 30-40s because `openclaw models list --all` loads every
       // provider's catalog. Show a clear message so the user knows to wait.
-      log("  Loading available models...");
+      log("  Loading available models (this may take 30-40 seconds)...");
       const providerModels = resolveProviderModels(proxiedProviders);
 
       // Let the user know if we fell back to the hardcoded list
@@ -1697,6 +1700,9 @@ async function runConfigureConnections(opts: SetupOptions): Promise<void> {
       log("");
       log(`  Default model updated to: ${defaultModel}`);
       log(`  Config saved: ${configPath}`);
+      log("");
+      log("  Note: existing TUI sessions keep their current model.");
+      log("  Use /models in the TUI or start a new session (/new) to use the new default.");
       continue;
     }
 
