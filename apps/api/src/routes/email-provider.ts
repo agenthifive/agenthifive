@@ -4,10 +4,10 @@
  * Translates REST-style requests from vault/execute into IMAP/SMTP
  * protocol operations. The agent sends JSON; this module talks IMAP.
  *
- * Connection pooling: IMAP connections are kept alive per connectionId
- * with a 10-minute idle timeout. SMTP connections are transient.
+ * IMAP connections are created per request in the dispatcher and passed
+ * to handlers. SMTP connections are transient.
  */
-import { ImapFlow, type FetchMessageObject, type MailboxObject, type MessageStructureObject } from "imapflow";
+import { ImapFlow, type FetchMessageObject, type MessageStructureObject } from "imapflow";
 import { createTransport } from "nodemailer";
 import type { FastifyBaseLogger } from "fastify";
 
@@ -35,60 +35,32 @@ interface AddressObject {
 }
 
 // ---------------------------------------------------------------------------
-// IMAP Connection Pool
+// IMAP Connection — connect per request, no pooling
 // ---------------------------------------------------------------------------
 
-const pool = new Map<string, { client: ImapFlow; timer: ReturnType<typeof setTimeout> }>();
-const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-
-function closeClient(connectionId: string): void {
-  const entry = pool.get(connectionId);
-  if (entry) {
-    entry.client.logout().catch(() => {});
-    pool.delete(connectionId);
-  }
-}
-
-async function getImapClient(
-  connectionId: string,
+/**
+ * Create a fresh IMAP connection for each request.
+ *
+ * No connection pooling — long-lived IMAP sockets emit errors (timeouts,
+ * resets) outside of request handling, which become uncaught exceptions
+ * and crash the server. The 1-2s TLS handshake overhead per request is
+ * acceptable for the safety guarantee.
+ *
+ * The caller MUST call client.logout() when done (use try/finally).
+ */
+async function connectImap(
   creds: EmailCredentials["imap"],
   log: FastifyBaseLogger,
 ): Promise<ImapFlow> {
-  const entry = pool.get(connectionId);
-  if (entry?.client.usable) {
-    clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => closeClient(connectionId), IDLE_TIMEOUT_MS);
-    return entry.client;
-  }
-
   const client = new ImapFlow({
     host: creds.host,
     port: creds.port,
     secure: creds.tls,
     auth: { user: creds.username, pass: creds.password },
     logger: false,
-    socketTimeout: IDLE_TIMEOUT_MS, // Close socket before it throws uncaught timeout
-    emitLogs: false,
-  });
-
-  // Catch IMAP socket errors so they don't crash the server as uncaught exceptions.
-  // ImapFlow emits 'error' on the underlying socket for timeouts, connection resets, etc.
-  client.on("error", (err: Error) => {
-    log.warn({ connectionId, error: err.message, code: (err as NodeJS.ErrnoException).code }, "email.imap.error");
-    closeClient(connectionId);
-  });
-
-  client.on("close", () => {
-    log.info({ connectionId }, "email.imap.closed");
-    pool.delete(connectionId);
   });
 
   await client.connect();
-  log.info({ connectionId, host: creds.host }, "email.imap.connected");
-
-  const timer = setTimeout(() => closeClient(connectionId), IDLE_TIMEOUT_MS);
-  pool.set(connectionId, { client, timer });
-
   return client;
 }
 
@@ -108,17 +80,31 @@ export async function handleEmailRequest(
   const path = parsed.pathname;
   const params = parsed.searchParams;
 
+  // Send is SMTP-only — no IMAP connection needed
+  if (method === "POST" && path === "/messages/send") {
+    try {
+      return await handleSendMessage(credentials, body as Record<string, unknown>, log);
+    } catch (err) {
+      return classifyEmailError(err, connectionId, method, path, log);
+    }
+  }
+
+  // All other operations need IMAP. Connect once, use, disconnect.
+  // No connection pooling — long-lived sockets emit uncaught errors that crash the server.
+  let client: ImapFlow | null = null;
   try {
+    client = await connectImap(credentials.imap, log);
+
     // Folders
     if (method === "GET" && path === "/folders") {
-      return await handleListFolders(connectionId, credentials, log);
+      return await handleListFolders(client, log);
     }
     if (method === "POST" && path === "/folders") {
-      return await handleCreateFolder(connectionId, credentials, body as Record<string, unknown>, log);
+      return await handleCreateFolder(client, body as Record<string, unknown>, log);
     }
     if (method === "DELETE" && path.startsWith("/folders/")) {
       const folderPath = decodeURIComponent(path.slice("/folders/".length));
-      return await handleDeleteFolder(connectionId, credentials, folderPath, log);
+      return await handleDeleteFolder(client, folderPath, log);
     }
 
     // Messages
@@ -129,7 +115,7 @@ export async function handleEmailRequest(
       const query = params.get("q") ?? null;
       const since = params.get("since") ?? null;
       const before = params.get("before") ?? null;
-      return await handleListMessages(connectionId, credentials, folder, { limit, offset, query: query ?? undefined, since: since ?? undefined, before: before ?? undefined }, log);
+      return await handleListMessages(client, folder, { limit, offset, query: query ?? undefined, since: since ?? undefined, before: before ?? undefined }, log);
     }
 
     // Message by UID
@@ -140,51 +126,61 @@ export async function handleEmailRequest(
       const folder = params.get("folder") ?? "INBOX";
 
       if (method === "GET" && subpath === "") {
-        return await handleReadMessage(connectionId, credentials, folder, uid, log);
+        return await handleReadMessage(client, credentials, folder, uid, log);
       }
       if (method === "GET" && subpath.startsWith("/attachments/")) {
         const partId = subpath.slice("/attachments/".length);
-        return await handleDownloadAttachment(connectionId, credentials, folder, uid, partId, log);
+        return await handleDownloadAttachment(client, folder, uid, partId, log);
       }
       if (method === "POST" && subpath === "/reply") {
-        return await handleReplyMessage(connectionId, credentials, folder, uid, body as Record<string, unknown>, log);
+        return await handleReplyMessage(client, credentials, folder, uid, body as Record<string, unknown>, log);
       }
       if (method === "POST" && subpath === "/forward") {
-        return await handleForwardMessage(connectionId, credentials, folder, uid, body as Record<string, unknown>, log);
+        return await handleForwardMessage(client, credentials, folder, uid, body as Record<string, unknown>, log);
       }
       if (method === "POST" && subpath === "/move") {
-        return await handleMoveMessage(connectionId, credentials, folder, uid, body as Record<string, unknown>, log);
+        return await handleMoveMessage(client, folder, uid, body as Record<string, unknown>, log);
       }
       if (method === "POST" && subpath === "/copy") {
-        return await handleCopyMessage(connectionId, credentials, folder, uid, body as Record<string, unknown>, log);
+        return await handleCopyMessage(client, folder, uid, body as Record<string, unknown>, log);
       }
       if (method === "DELETE" && subpath === "") {
-        return await handleDeleteMessage(connectionId, credentials, folder, uid, log);
+        return await handleDeleteMessage(client, folder, uid, log);
       }
       if (method === "PATCH" && subpath === "/flags") {
-        return await handleUpdateFlags(connectionId, credentials, folder, uid, body as Record<string, unknown>, log);
+        return await handleUpdateFlags(client, folder, uid, body as Record<string, unknown>, log);
       }
-    }
-
-    // Send
-    if (method === "POST" && path === "/messages/send") {
-      return await handleSendMessage(credentials, body as Record<string, unknown>, log);
     }
 
     return { status: 404, body: { error: `Unknown email endpoint: ${method} ${path}` } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log.error({ err, connectionId, method, path }, "email.request.error");
-
-    if (message.includes("Authentication") || message.includes("LOGIN")) {
-      return { status: 401, body: { error: "Email authentication failed — check username and password" } };
+    return classifyEmailError(err, connectionId, method, path, log);
+  } finally {
+    // Always disconnect — no pooling, no lingering sockets
+    if (client) {
+      client.logout().catch(() => {});
     }
-    if (message.includes("ECONNREFUSED") || message.includes("EHOSTUNREACH")) {
-      return { status: 502, body: { error: `Cannot connect to email server: ${message}` } };
-    }
-
-    return { status: 500, body: { error: `Email operation failed: ${message}` } };
   }
+}
+
+function classifyEmailError(
+  err: unknown,
+  connectionId: string,
+  method: string,
+  path: string,
+  log: FastifyBaseLogger,
+): EmailResult {
+  const message = err instanceof Error ? err.message : String(err);
+  log.error({ err, connectionId, method, path }, "email.request.error");
+
+  if (message.includes("Authentication") || message.includes("LOGIN")) {
+    return { status: 401, body: { error: "Email authentication failed — check username and password" } };
+  }
+  if (message.includes("ECONNREFUSED") || message.includes("EHOSTUNREACH")) {
+    return { status: 502, body: { error: `Cannot connect to email server: ${message}` } };
+  }
+
+  return { status: 500, body: { error: `Email operation failed: ${message}` } };
 }
 
 // ---------------------------------------------------------------------------
@@ -192,11 +188,9 @@ export async function handleEmailRequest(
 // ---------------------------------------------------------------------------
 
 async function handleListFolders(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const mailboxes = await client.list();
 
   const folders = mailboxes.map((mb) => ({
@@ -222,26 +216,22 @@ async function handleListFolders(
 }
 
 async function handleCreateFolder(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   body: Record<string, unknown>,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
   const name = body.name as string;
   if (!name) return { status: 400, body: { error: "Folder name is required" } };
 
-  const client = await getImapClient(connectionId, credentials.imap, log);
   await client.mailboxCreate(name);
   return { status: 201, body: { created: true, path: name } };
 }
 
 async function handleDeleteFolder(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folderPath: string,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   await client.mailboxDelete(folderPath);
   return { status: 200, body: { deleted: true, path: folderPath } };
 }
@@ -296,13 +286,11 @@ function hasAttachments(struct?: MessageStructureObject): boolean {
 }
 
 async function handleListMessages(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   opts: { limit: number; offset: number; query?: string | undefined; since?: string | undefined; before?: string | undefined },
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
 
   try {
@@ -351,13 +339,12 @@ async function handleListMessages(
 // ---------------------------------------------------------------------------
 
 async function handleReadMessage(
-  connectionId: string,
+  client: ImapFlow,
   credentials: EmailCredentials,
   folder: string,
   uid: number,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
 
   try {
@@ -421,14 +408,12 @@ async function handleReadMessage(
 // ---------------------------------------------------------------------------
 
 async function handleDownloadAttachment(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   uid: number,
   partId: string,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
 
   try {
@@ -524,7 +509,7 @@ async function handleSendMessage(
 }
 
 async function handleReplyMessage(
-  connectionId: string,
+  client: ImapFlow,
   credentials: EmailCredentials,
   folder: string,
   uid: number,
@@ -532,7 +517,7 @@ async function handleReplyMessage(
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
   // Fetch original message for reply headers
-  const original = await handleReadMessage(connectionId, credentials, folder, uid, log);
+  const original = await handleReadMessage(client, credentials, folder, uid, log);
   if (original.status !== 200) return original;
 
   const orig = original.body as Record<string, unknown>;
@@ -564,14 +549,14 @@ async function handleReplyMessage(
 }
 
 async function handleForwardMessage(
-  connectionId: string,
+  client: ImapFlow,
   credentials: EmailCredentials,
   folder: string,
   uid: number,
   body: Record<string, unknown>,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const original = await handleReadMessage(connectionId, credentials, folder, uid, log);
+  const original = await handleReadMessage(client, credentials, folder, uid, log);
   if (original.status !== 200) return original;
 
   const orig = original.body as Record<string, unknown>;
@@ -594,8 +579,7 @@ async function handleForwardMessage(
 // ---------------------------------------------------------------------------
 
 async function handleMoveMessage(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   uid: number,
   body: Record<string, unknown>,
@@ -604,7 +588,6 @@ async function handleMoveMessage(
   const destination = body.destination as string;
   if (!destination) return { status: 400, body: { error: "Destination folder is required" } };
 
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
   try {
     await client.messageMove([uid], destination, { uid: true });
@@ -615,8 +598,7 @@ async function handleMoveMessage(
 }
 
 async function handleCopyMessage(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   uid: number,
   body: Record<string, unknown>,
@@ -625,7 +607,6 @@ async function handleCopyMessage(
   const destination = body.destination as string;
   if (!destination) return { status: 400, body: { error: "Destination folder is required" } };
 
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
   try {
     await client.messageCopy([uid], destination, { uid: true });
@@ -636,13 +617,11 @@ async function handleCopyMessage(
 }
 
 async function handleDeleteMessage(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   uid: number,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
   try {
     await client.messageDelete([uid], { uid: true });
@@ -653,14 +632,12 @@ async function handleDeleteMessage(
 }
 
 async function handleUpdateFlags(
-  connectionId: string,
-  credentials: EmailCredentials,
+  client: ImapFlow,
   folder: string,
   uid: number,
   body: Record<string, unknown>,
   log: FastifyBaseLogger,
 ): Promise<EmailResult> {
-  const client = await getImapClient(connectionId, credentials.imap, log);
   const lock = await client.getMailboxLock(folder);
   try {
     const add = body.add as string[] | undefined;
@@ -726,12 +703,3 @@ export async function validateEmailConnection(credentials: EmailCredentials): Pr
   return { valid: true };
 }
 
-// ---------------------------------------------------------------------------
-// Cleanup (called on server shutdown)
-// ---------------------------------------------------------------------------
-
-export function closeAllEmailConnections(): void {
-  for (const [id] of pool) {
-    closeClient(id);
-  }
-}

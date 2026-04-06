@@ -168,7 +168,6 @@ let handleEmailRequest: (
 ) => Promise<{ status: number; body: unknown }>;
 
 let validateEmailConnection: (credentials: EmailCredentials) => Promise<{ valid: boolean; error?: string }>;
-let closeAllEmailConnections: () => void;
 
 // =============================================================================
 // STEP 3: Test helpers
@@ -205,13 +204,11 @@ describe("email-provider", () => {
     const mod = await import("../../routes/email-provider.js");
     handleEmailRequest = mod.handleEmailRequest;
     validateEmailConnection = mod.validateEmailConnection;
-    closeAllEmailConnections = mod.closeAllEmailConnections;
   });
 
   beforeEach(() => {
     resetImapState();
     resetSmtpState();
-    closeAllEmailConnections();
   });
 
   // =========================================================================
