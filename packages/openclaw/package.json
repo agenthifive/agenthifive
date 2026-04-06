@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.48",
-    "jose": "^5.9.3"
+    "jose": "^6.2.2"
   },
   "peerDependencies": {
     "openclaw": "^2026.3.22"

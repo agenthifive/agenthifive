@@ -39,7 +39,7 @@
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.1.0",
     "imapflow": "^1.2.18",
-    "jose": "^5.9.3",
+    "jose": "^6.2.2",
     "libphonenumber-js": "^1.12.37",
     "mailparser": "^3.9.6",
     "nodemailer": "^8.0.1",

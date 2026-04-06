@@ -31,7 +31,7 @@
     "access": "public"
   },
   "dependencies": {
-    "jose": "^5.9.3"
+    "jose": "^6.2.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
