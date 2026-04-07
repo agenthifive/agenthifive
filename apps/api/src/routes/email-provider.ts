@@ -465,6 +465,23 @@ async function handleDownloadAttachment(
       return { status: 404, body: { error: `Attachment ${partId} not found in message ${uid}` } };
     }
 
+    // Guard against large attachments that would blow up the JSON response
+    // and corrupt the agent's context window. 512KB raw = ~680KB base64.
+    const MAX_ATTACHMENT_SIZE = 512 * 1024;
+    if (att.size > MAX_ATTACHMENT_SIZE) {
+      return {
+        status: 200,
+        body: {
+          filename: att.filename ?? "attachment",
+          contentType: att.contentType,
+          size: att.size,
+          content: null,
+          truncated: true,
+          message: `Attachment is too large for JSON transport (${(att.size / 1024).toFixed(0)}KB). Use vault_download for binary files, or ask the user to access the email directly.`,
+        },
+      };
+    }
+
     // Return base64-encoded content for JSON transport
     return {
       status: 200,
