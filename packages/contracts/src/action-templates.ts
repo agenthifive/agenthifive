@@ -87,6 +87,9 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
   t("trello-manage", "trello", "Manage Trello content",  "Read, create, update cards and lists • Security tier controls approval",               []),
   t("jira-read",     "jira",   "Read Jira issues",       "Search and read issues, projects, and comments",                                      []),
   t("jira-manage",   "jira",   "Manage Jira issues",     "Read, create, update issues and comments • Security tier controls approval",           []),
+  // ── Email (IMAP/SMTP) ────────────────────────────────────────
+  t("email-read",    "email-imap", "Read emails",              "List folders, read messages and threads",                                          []),
+  t("email-manage",  "email-imap", "Send and manage emails",   "Read, send, reply, forward, move, delete emails • Security tier controls approval", []),
 ];
 
 /** Validate an action template ID */

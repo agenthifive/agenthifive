@@ -3269,6 +3269,55 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate[]> = {
  * Email IMAP presets — uses virtual URL paths (email-imap.internal/...)
  * Modeled on Gmail manage presets but adapted for the IMAP REST translation layer.
  */
+/**
+ * Email IMAP READ-ONLY presets — read messages and folders only
+ */
+function emailImapReadPresets(): Record<Exclude<RulePresetId, "custom">, RulePreset> {
+  return {
+    minimal: {
+      ...MINIMAL_PRESET,
+      description: "The agent can read your emails and folders. No privacy filtering.",
+      rules: {
+        request: [
+          { label: "Allow reads", match: { methods: ["GET"] }, action: "allow" },
+          { label: "Block writes", match: { methods: ["POST", "PUT", "PATCH", "DELETE"] }, action: "deny" },
+        ],
+        response: [],
+      },
+    },
+    standard: {
+      ...STANDARD_PRESET,
+      description: "The agent can read your emails and folders. Attachments require approval. Personal information is automatically redacted.",
+      rules: {
+        request: [
+          { label: "Approve attachments", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+/attachments" }, action: "require_approval" },
+          { label: "Allow reading messages", match: { methods: ["GET"], urlPattern: "^/messages" }, action: "allow" },
+          { label: "Allow reading folders", match: { methods: ["GET"], urlPattern: "^/folders" }, action: "allow" },
+          { label: "Block everything else", match: { methods: ["POST", "PUT", "PATCH", "DELETE"] }, action: "deny" },
+        ],
+        response: [PII_REDACT_RULE],
+      },
+    },
+    strict: {
+      ...STRICT_PRESET,
+      description: "The agent can list folders and browse message subjects. Reading full message content requires approval. Attachments are blocked. Personal information is redacted.",
+      rules: {
+        request: [
+          { label: "Allow listing folders", match: { methods: ["GET"], urlPattern: "^/folders$" }, action: "allow" },
+          { label: "Allow listing messages", match: { methods: ["GET"], urlPattern: "^/messages$" }, action: "allow" },
+          { label: "Approve reading message content", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+" }, action: "require_approval" },
+          { label: "Block attachments", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+/attachments" }, action: "deny" },
+          { label: "Block everything else", match: { methods: ["GET", "POST", "PUT", "PATCH", "DELETE"] }, action: "deny" },
+        ],
+        response: [PII_REDACT_RULE],
+      },
+    },
+  };
+}
+
+/**
+ * Email IMAP MANAGE presets — read + send + manage emails
+ */
 function emailImapPresets(): Record<Exclude<RulePresetId, "custom">, RulePreset> {
   return {
     minimal: {
@@ -3555,6 +3604,9 @@ export function getPresetsForActionTemplate(
     "trello-manage": trelloManagePresets,
     "jira-read": jiraReadPresets,
     "jira-manage": jiraManagePresets,
+    // Email (IMAP/SMTP)
+    "email-read": emailImapReadPresets,
+    "email-manage": emailImapPresets,
   };
   const factory = ACTION_TEMPLATE_PRESETS[actionTemplateId];
   return factory ? factory() : null;
