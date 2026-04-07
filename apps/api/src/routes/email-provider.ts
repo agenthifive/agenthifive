@@ -401,7 +401,7 @@ async function handleReadMessage(
       filename: att.filename ?? `attachment-${i}`,
       contentType: att.contentType,
       size: att.size,
-      partId: att.contentId ?? String(i + 1),
+      partId: String(i + 1),
     }));
 
     return {
@@ -458,7 +458,8 @@ async function handleDownloadAttachment(
       return { status: 500, body: { error: "Failed to fetch message source" } };
     }
     const parsed = await mailparser.simpleParser(msg.source);
-    const att = parsed.attachments?.find((a, i) => (a.contentId ?? String(i + 1)) === partId);
+    const decodedPartId = decodeURIComponent(partId);
+    const att = parsed.attachments?.[parseInt(decodedPartId, 10) - 1];
 
     if (!att) {
       return { status: 404, body: { error: `Attachment ${partId} not found in message ${uid}` } };
