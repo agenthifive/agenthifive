@@ -99,6 +99,7 @@ export async function handleEmailRequest(
   credentials: EmailCredentials,
   connectionId: string,
   log: FastifyBaseLogger,
+  options?: { download?: boolean },
 ): Promise<EmailResult> {
   const parsed = new URL(url, "https://email-imap.internal");
   const path = parsed.pathname;
@@ -467,8 +468,9 @@ async function handleDownloadAttachment(
 
     // Guard against large attachments that would blow up the JSON response
     // and corrupt the agent's context window. 512KB raw = ~680KB base64.
+    // Skip when download: true — the vault will decode base64 and stream raw binary.
     const MAX_ATTACHMENT_SIZE = 512 * 1024;
-    if (att.size > MAX_ATTACHMENT_SIZE) {
+    if (!options?.download && att.size > MAX_ATTACHMENT_SIZE) {
       return {
         status: 200,
         body: {

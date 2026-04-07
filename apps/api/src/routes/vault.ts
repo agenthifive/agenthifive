@@ -3654,7 +3654,7 @@ export async function executeModelBRequest(
     if (!emailCreds.imap || !emailCreds.smtp) {
       return reply.code(500).send({ error: "Email credentials incomplete" });
     }
-    const result = await handleEmailRequest(method, url, requestBody, emailCreds, connectionId, log ?? fastify.log);
+    const result = await handleEmailRequest(method, url, requestBody, emailCreds, connectionId, log ?? fastify.log, { download: !!ctx.download });
 
     // When download: true and the result has base64 content (attachment), decode
     // and stream raw binary so vault_download saves a usable file.
