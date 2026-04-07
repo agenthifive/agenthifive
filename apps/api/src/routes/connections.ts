@@ -1032,7 +1032,7 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
     const tokenPayload = JSON.stringify(tokenData);
     const encryptedTokens = JSON.stringify(encrypt(tokenPayload, getEncryptionKey()));
 
-    const grantedScopes = ["imap", "smtp"];
+    const grantedScopes = ["imap", "smtp", "write"];
 
     const [connection] = await db
       .insert(connections)
