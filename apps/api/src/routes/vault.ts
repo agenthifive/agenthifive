@@ -3655,6 +3655,30 @@ export async function executeModelBRequest(
       return reply.code(500).send({ error: "Email credentials incomplete" });
     }
     const result = await handleEmailRequest(method, url, requestBody, emailCreds, connectionId, log ?? fastify.log);
+
+    // When download: true and the result has base64 content (attachment), decode
+    // and stream raw binary so vault_download saves a usable file.
+    const emailBody = result.body as Record<string, unknown> | undefined;
+    if (ctx.download && result.status >= 200 && result.status < 300 && emailBody?.content && typeof emailBody.content === "string") {
+      reply.hijack();
+      const decoded = Buffer.from(emailBody.content as string, "base64");
+      const ct = (typeof emailBody.contentType === "string" ? emailBody.contentType : "application/octet-stream");
+      const filename = typeof emailBody.filename === "string" ? emailBody.filename : null;
+      const headers: Record<string, string> = {
+        "Content-Type": ct,
+        "Content-Length": String(decoded.length),
+        "Cache-Control": "no-cache",
+      };
+      if (filename) headers["Content-Disposition"] = `attachment; filename="${filename}"`;
+      reply.raw.writeHead(200, headers);
+      reply.raw.end(decoded);
+      logExecutionCompleted(sub, policy.agentId, connectionId, {
+        model: "B", method, path: new URL(url).pathname,
+        responseStatus: result.status, dataSize: decoded.length, provider: connection.provider,
+      });
+      return;
+    }
+
     const responseJson = JSON.stringify(result.body);
     const { auditId } = logExecutionCompleted(sub, policy.agentId, connectionId, {
       model: "B",
@@ -4083,6 +4107,70 @@ export async function executeModelBRequest(
     const contentLength = Array.isArray(providerResponse.headers["content-length"])
       ? providerResponse.headers["content-length"][0]
       : providerResponse.headers["content-length"];
+
+    // Some providers (Gmail, IMAP) return binary content as base64 inside JSON
+    // (e.g., {"data": "<base64>", "size": 12345}). When download: true, detect
+    // this pattern, decode the base64, and stream raw bytes instead so that
+    // vault_download saves a usable binary file.
+    const isJsonResponse = upstreamCT.includes("application/json");
+    if (isJsonResponse) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of providerResponse.body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const jsonText = Buffer.concat(chunks).toString("utf-8");
+      try {
+        const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+        // Gmail attachment API returns { data: "<base64>", size: N, attachmentId: "..." }
+        // IMAP attachment returns { content: "<base64>", filename: "...", contentType: "...", size: N }
+        const b64Data = (typeof parsed.data === "string" ? parsed.data : null)
+          ?? (typeof parsed.content === "string" ? parsed.content : null);
+        if (b64Data && b64Data.length > 100) {
+          // Decode base64 (Gmail uses URL-safe base64 — handle both standard and URL-safe)
+          const decoded = Buffer.from(b64Data, "base64url");
+          // Infer content type from the JSON metadata or filename
+          const inferredCT = (typeof parsed.contentType === "string" ? parsed.contentType : null)
+            ?? (typeof parsed.mimeType === "string" ? parsed.mimeType : null)
+            ?? "application/octet-stream";
+          const filename = typeof parsed.filename === "string" ? parsed.filename : null;
+
+          const responseHeaders: Record<string, string> = {
+            "Content-Type": inferredCT,
+            "Content-Length": String(decoded.length),
+            "Cache-Control": "no-cache",
+          };
+          if (filename) {
+            responseHeaders["Content-Disposition"] = `attachment; filename="${filename}"`;
+          }
+          reply.raw.writeHead(200, responseHeaders);
+          reply.raw.end(decoded);
+          logExecutionCompleted(sub, policy.agentId, connectionId, {
+            model: "B", method, path: auditPath,
+            responseStatus: providerResponse.statusCode,
+            dataSize: decoded.length,
+            provider: connection.provider,
+          });
+          return;
+        }
+      } catch {
+        // Not valid JSON or no base64 field — fall through to raw pipe
+      }
+      // JSON but no base64 field — pipe the raw JSON
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": upstreamCT,
+        "Cache-Control": "no-cache",
+      };
+      if (contentLength) responseHeaders["Content-Length"] = contentLength;
+      reply.raw.writeHead(providerResponse.statusCode, responseHeaders);
+      reply.raw.end(Buffer.concat(chunks));
+      logExecutionCompleted(sub, policy.agentId, connectionId, {
+        model: "B", method, path: auditPath,
+        responseStatus: providerResponse.statusCode,
+        dataSize: Buffer.concat(chunks).length,
+        provider: connection.provider,
+      });
+      return;
+    }
 
     const responseHeaders: Record<string, string> = {
       "Content-Type": upstreamCT,

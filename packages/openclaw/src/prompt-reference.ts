@@ -362,7 +362,7 @@ When a channel is enabled and the vault has an active connection, incoming messa
 
 - **Never retry the same \`vault_execute\` call more than once.** If the same call fails twice (original + 1 retry), stop and explain the error to the user. Do NOT keep trying.
 - **Empty or missing response body:** If a \`vault_execute\` call returns an empty body, no data, or times out, treat it as a definitive failure. Do NOT retry. Report the issue to the user immediately.
-- **Binary file downloads:** \`vault_execute\` cannot return binary data — it returns a \`_binaryContent\` metadata object instead. Before downloading any file, check its content type or mimeType. Prefer structured API access (JSON) over binary downloads whenever possible. When binary is unavoidable, use \`vault_download\` — it saves the file to disk and returns the local file path.
+- **Attachments and binary files: always use \`vault_download\`**, never \`vault_execute\`. This applies to Gmail attachments, IMAP email attachments, Drive files, OneDrive files, and any other binary content. The vault automatically decodes base64-wrapped responses (Gmail, IMAP) into raw binary files. \`vault_execute\` returns base64 data that is too large for your context window and will cause failures.
 - **Large responses saved to disk:** When a \`vault_execute\` response exceeds ~50KB (e.g., JSON with embedded base64 attachments), the full JSON is automatically saved to disk. The result includes \`responseSavedToDisk: true\`, \`path\` (local file), \`preview\` (structural summary), and \`hint\`. Read the file with your file tools to access specific fields. This prevents large payloads from filling your context window.
 
 ## Error Handling
@@ -391,7 +391,7 @@ Google APIs use standard REST: GET for reads, POST for writes. Use \`connectionI
 **Gmail** (base: \`https://gmail.googleapis.com\`):
 - List messages: \`GET /gmail/v1/users/me/messages\` — query: \`{ q, maxResults, labelIds }\`
 - Get message: \`GET /gmail/v1/users/me/messages/{id}\` — query: \`{ format: "full" }\`
-- Get attachment: \`GET /gmail/v1/users/me/messages/{id}/attachments/{attachmentId}\`
+- Get attachment: **use \`vault_download\`** with \`GET /gmail/v1/users/me/messages/{id}/attachments/{attachmentId}\` — the vault decodes Gmail's base64 JSON response and saves the raw binary file to disk. Do NOT use vault_execute for attachments.
 - List labels: \`GET /gmail/v1/users/me/labels\`
 - Send message: \`POST /gmail/v1/users/me/messages/send\` — body: \`{ raw: "<base64url-encoded RFC 2822 email>" }\`
   ⚠ The \`raw\` field must be a base64url-encoded string of a complete RFC 2822 email (with To, Subject, MIME headers).
@@ -659,7 +659,7 @@ The vault handles IMAP/SMTP authentication automatically — never provide serve
 - List messages: \`GET /messages?folder=INBOX&limit=10\` — paginated, newest first
 - Search messages: \`GET /messages?q=from:bob subject:meeting\` — search with operators (see below)
 - Read message: \`GET /messages/{uid}?folder=INBOX\` — returns text, HTML body, and attachment metadata
-- Download attachment: \`GET /messages/{uid}/attachments/{partId}?folder=INBOX\` — partId is the 1-based numeric index from the attachments array (e.g., \`1\` for the first attachment). Returns base64-encoded content (small attachments only — files over 500KB may be too large for JSON transport).
+- Download attachment: **use \`vault_download\`** with \`GET /messages/{uid}/attachments/{partId}?folder=INBOX\` — partId is the 1-based numeric index from the attachments array (e.g., \`1\` for the first attachment). The vault decodes the attachment and saves the raw binary file to disk. Do NOT use vault_execute for attachments — the base64 data is too large for your context.
 
 **Write operations (POST/PATCH/DELETE):**
 - Send email: \`POST /messages/send\` — body: \`{ "to": "alice@example.com", "subject": "Hello", "textBody": "Message content" }\`
