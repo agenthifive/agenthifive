@@ -652,13 +652,14 @@ Use \`connectionId\` from \`vault_connections_list\`. Trello is NOT a singleton 
 
 Connect to any email server via IMAP/SMTP. Use \`connectionId\` from \`vault_connections_list\` (or \`service: "email-imap"\` if only one connection exists).
 The vault handles IMAP/SMTP authentication automatically — never provide server credentials yourself.
+**Always use relative paths** (e.g., \`/messages?folder=INBOX\`), never full URLs with the IMAP hostname.
 
 **Read operations (GET):**
 - List folders: \`GET /folders\` — returns all email folders with message counts
 - List messages: \`GET /messages?folder=INBOX&limit=10\` — paginated, newest first
 - Search messages: \`GET /messages?q=from:bob subject:meeting\` — search with operators (see below)
 - Read message: \`GET /messages/{uid}?folder=INBOX\` — returns text, HTML body, and attachment metadata
-- Download attachment: \`GET /messages/{uid}/attachments/{partId}?folder=INBOX\` — returns attachment content
+- Download attachment: \`GET /messages/{uid}/attachments/{partId}?folder=INBOX\` — partId is the 1-based numeric index from the attachments array (e.g., \`1\` for the first attachment). Returns base64-encoded content (small attachments only — files over 500KB may be too large for JSON transport).
 
 **Write operations (POST/PATCH/DELETE):**
 - Send email: \`POST /messages/send\` — body: \`{ "to": "alice@example.com", "subject": "Hello", "textBody": "Message content" }\`
