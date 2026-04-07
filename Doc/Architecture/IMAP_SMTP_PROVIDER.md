@@ -119,15 +119,13 @@ New connection form fields:
 - Password
 - "Test Connection" button (validates IMAP login + SMTP EHLO)
 
-Provider presets for common providers:
+Provider presets for providers that support standard IMAP/SMTP authentication (Gmail and Outlook require OAuth — use their dedicated connections instead):
 
-| Provider | IMAP Host | SMTP Host |
-|----------|-----------|-----------|
-| Gmail | imap.gmail.com:993 | smtp.gmail.com:587 |
-| iCloud | imap.mail.me.com:993 | smtp.mail.me.com:587 |
-| Fastmail | imap.fastmail.com:993 | smtp.fastmail.com:587 |
-| Yahoo | imap.mail.yahoo.com:993 | smtp.mail.yahoo.com:587 |
-| Custom | User-provided | User-provided |
+| Provider | IMAP Host | SMTP Host | Notes |
+|----------|-----------|-----------|-------|
+| Fastmail | imap.fastmail.com:993 | smtp.fastmail.com:587 | |
+| iCloud | imap.mail.me.com:993 | smtp.mail.me.com:587 | Requires app-specific password |
+| Custom | User-provided | User-provided | Self-hosted, ProtonMail Bridge, etc. |
 
 ## 5. REST API Surface
 

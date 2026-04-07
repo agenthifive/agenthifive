@@ -9,7 +9,7 @@ description: Connect any email server via IMAP and SMTP for vault-managed email 
 Connect to any email server that supports IMAP and SMTP. The vault stores your email credentials, translates REST requests to IMAP/SMTP protocol commands, and applies the full policy engine (allowlists, PII redaction, rate limits, approval) to every email operation.
 
 :::info
-Unlike the [Google Gmail](/connections/google) and [Microsoft Outlook](/connections/microsoft) connections which use provider-specific REST APIs, the Email (IMAP/SMTP) connection works with **any email provider** — including self-hosted mail servers, iCloud, Fastmail, Yahoo, and corporate Exchange (IMAP).
+Unlike the [Google Gmail](/connections/google) and [Microsoft Outlook](/connections/microsoft) connections which use OAuth and provider-specific REST APIs, the Email (IMAP/SMTP) connection works with providers that support standard IMAP/SMTP authentication — such as Fastmail, iCloud (with app-specific passwords), ProtonMail Bridge, and self-hosted mail servers. For Gmail and Outlook, use the OAuth connections instead.
 :::
 
 ## Connection Setup
@@ -61,13 +61,14 @@ curl -X POST https://your-vault.com/v1/connections/email \
 
 | Provider | IMAP Host | SMTP Host | Notes |
 |----------|-----------|-----------|-------|
-| Gmail | `imap.gmail.com:993` | `smtp.gmail.com:587` | Requires [App Password](https://myaccount.google.com/apppasswords) if 2FA enabled |
-| iCloud | `imap.mail.me.com:993` | `smtp.mail.me.com:587` | Requires [App-Specific Password](https://appleid.apple.com) |
 | Fastmail | `imap.fastmail.com:993` | `smtp.fastmail.com:587` | Supports app passwords |
-| Yahoo | `imap.mail.yahoo.com:993` | `smtp.mail.yahoo.com:587` | Requires app password |
-| Outlook/Hotmail | `outlook.office365.com:993` | `smtp.office365.com:587` | Use Microsoft 365 password |
+| iCloud | `imap.mail.me.com:993` | `smtp.mail.me.com:587` | Requires [App-Specific Password](https://appleid.apple.com) |
 | ProtonMail | `127.0.0.1:1143` | `127.0.0.1:1025` | Requires [ProtonMail Bridge](https://proton.me/mail/bridge) |
 | Self-hosted | Your server | Your server | Dovecot, Postfix, etc. |
+
+:::warning
+**Gmail** and **Outlook/Hotmail** have disabled standard IMAP password authentication. Use the [Google Gmail](/connections/google) or [Microsoft Outlook](/connections/microsoft) OAuth connections instead.
+:::
 
 ## Vault API Usage
 

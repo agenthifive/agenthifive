@@ -18,7 +18,7 @@ import { db } from "../db/client.js";
 import { connections, policies } from "../db/schema/index.js";
 import { generatePolicyFromTemplate } from "../services/policy-generator.js";
 
-const providerEnum = ["google", "microsoft", "telegram", "slack", "anthropic", "openai", "gemini", "openrouter", "notion", "trello", "jira"] as const;
+const providerEnum = ["google", "microsoft", "telegram", "slack", "anthropic", "openai", "gemini", "openrouter", "notion", "trello", "jira", "email"] as const;
 
 const serviceEnum = [
   "google-gmail",
@@ -58,6 +58,7 @@ const providerOrServiceEnum = [
   "microsoft-onedrive",
   "microsoft-outlook-contacts",
   "anthropic-messages",
+  "email-imap",
 ] as const;
 
 export default async function templateRoutes(fastify: FastifyInstance) {

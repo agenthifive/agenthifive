@@ -874,11 +874,9 @@ export default function CreateConnectionModal({
           {step === "flow" && flowService && SERVICE_CATALOG[flowService].credentialType === "email" && (() => {
             const flowEntry = SERVICE_CATALOG[flowService];
 
-            const EMAIL_PRESETS: { name: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }[] = [
-              { name: "Gmail", imapHost: "imap.gmail.com", imapPort: 993, smtpHost: "smtp.gmail.com", smtpPort: 587 },
-              { name: "iCloud", imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587 },
+            const EMAIL_PRESETS: { name: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number; note?: string }[] = [
               { name: "Fastmail", imapHost: "imap.fastmail.com", imapPort: 993, smtpHost: "smtp.fastmail.com", smtpPort: 587 },
-              { name: "Yahoo", imapHost: "imap.mail.yahoo.com", imapPort: 993, smtpHost: "smtp.mail.yahoo.com", smtpPort: 587 },
+              { name: "iCloud", imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587, note: "Requires an app-specific password from appleid.apple.com" },
             ];
 
             function applyPreset(preset: { imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }) {
@@ -903,7 +901,7 @@ export default function CreateConnectionModal({
             <div className="max-w-xl mx-auto">
               <div className="rounded-lg border border-border bg-card p-6">
                 <p className="text-sm text-muted mb-4">
-                  Connect to any email account via IMAP and SMTP. Use an app-specific password for accounts with two-factor authentication.
+                  Connect to any email account via IMAP and SMTP. For Gmail and Outlook, use the OAuth connection instead. IMAP is for providers like Fastmail, iCloud, or self-hosted mail servers.
                 </p>
 
                 {/* Provider presets */}

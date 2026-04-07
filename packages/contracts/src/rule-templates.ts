@@ -3196,6 +3196,56 @@ export const RULE_PRESETS: Record<string, Record<Exclude<RulePresetId, "custom">
 };
 
 /** All individual rule templates indexed by provider */
+const EMAIL_RULE_TEMPLATES: RuleTemplate[] = [
+  {
+    id: "email-read-rules",
+    name: "Email - Allow reading",
+    description: "Allow reading messages, folders, and message content without approval",
+    provider: "email",
+    preset: "standard",
+    requestRules: [
+      { label: "Allow reading messages", match: { methods: ["GET"], urlPattern: "^/messages" }, action: "allow" },
+      { label: "Allow reading folders", match: { methods: ["GET"], urlPattern: "^/folders" }, action: "allow" },
+    ],
+    responseRules: [],
+  },
+  {
+    id: "email-send-approve",
+    name: "Email - Approve sends",
+    description: "Require approval for sending, replying, and forwarding emails",
+    provider: "email",
+    preset: "standard",
+    requestRules: [
+      { label: "Approve sending", match: { methods: ["POST"], urlPattern: "^/messages/send$" }, action: "require_approval" },
+      { label: "Approve replies", match: { methods: ["POST"], urlPattern: "^/messages/[^/]+/reply$" }, action: "require_approval" },
+      { label: "Approve forwards", match: { methods: ["POST"], urlPattern: "^/messages/[^/]+/forward$" }, action: "require_approval" },
+    ],
+    responseRules: [],
+  },
+  {
+    id: "email-delete-approve",
+    name: "Email - Approve deletes",
+    description: "Require approval for deleting or trashing messages",
+    provider: "email",
+    preset: "standard",
+    requestRules: [
+      { label: "Approve deletes", match: { methods: ["DELETE"] }, action: "require_approval" },
+    ],
+    responseRules: [],
+  },
+  {
+    id: "email-attachment-approve",
+    name: "Email - Approve attachments",
+    description: "Require approval before downloading email attachments",
+    provider: "email",
+    preset: "strict",
+    requestRules: [
+      { label: "Approve attachments", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+/attachments" }, action: "require_approval" },
+    ],
+    responseRules: [],
+  },
+];
+
 export const RULE_TEMPLATES: Record<string, RuleTemplate[]> = {
   google: GOOGLE_RULE_TEMPLATES,
   microsoft: MICROSOFT_RULE_TEMPLATES,
@@ -3208,7 +3258,66 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate[]> = {
   notion: NOTION_RULE_TEMPLATES,
   trello: TRELLO_RULE_TEMPLATES,
   jira: JIRA_RULE_TEMPLATES,
+  email: EMAIL_RULE_TEMPLATES,
 };
+
+// ─────────────────────────────────────────────────────────────────
+// Email (IMAP/SMTP) presets
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Email IMAP presets — uses virtual URL paths (email-imap.internal/...)
+ * Modeled on Gmail manage presets but adapted for the IMAP REST translation layer.
+ */
+function emailImapPresets(): Record<Exclude<RulePresetId, "custom">, RulePreset> {
+  return {
+    minimal: {
+      ...MINIMAL_PRESET,
+      description: "The agent can read, send, and manage your emails with no restrictions. No privacy filtering.",
+      recommended: { defaultMode: "read_write", stepUpApproval: "never" },
+      rules: {
+        request: [
+          { label: "Allow all reads", match: { methods: ["GET"] }, action: "allow" },
+          { label: "Allow writes", match: { methods: ["POST", "PUT", "PATCH", "DELETE"] }, action: "allow" },
+        ],
+        response: [],
+      },
+    },
+    standard: {
+      ...STANDARD_PRESET,
+      description: "The agent can read your emails and folders. Sending emails, moving/deleting messages, and downloading attachments require your approval. Personal information is automatically redacted.",
+      rules: {
+        request: [
+          { label: "Approve attachments", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+/attachments" }, action: "require_approval" },
+          { label: "Allow reading messages", match: { methods: ["GET"], urlPattern: "^/messages" }, action: "allow" },
+          { label: "Allow reading folders", match: { methods: ["GET"], urlPattern: "^/folders" }, action: "allow" },
+          { label: "Approve sending", match: { methods: ["POST"], urlPattern: "^/messages/send" }, action: "require_approval" },
+          { label: "Approve reply/forward", match: { methods: ["POST"], urlPattern: "^/messages/[^/]+/(reply|forward)" }, action: "require_approval" },
+          { label: "Approve move/copy/delete", match: { methods: ["POST", "PATCH", "DELETE"], urlPattern: "^/messages/[^/]+/(move|copy|flags)" }, action: "require_approval" },
+          { label: "Approve deletes", match: { methods: ["DELETE"] }, action: "require_approval" },
+        ],
+        response: [PII_REDACT_RULE],
+      },
+    },
+    strict: {
+      ...STRICT_PRESET,
+      description: "The agent can list folders and browse message subjects. Reading full message content requires approval. Sending, replying, and deleting are blocked. Personal information is redacted.",
+      rules: {
+        request: [
+          { label: "Allow listing folders", match: { methods: ["GET"], urlPattern: "^/folders$" }, action: "allow" },
+          { label: "Allow listing messages", match: { methods: ["GET"], urlPattern: "^/messages$" }, action: "allow" },
+          { label: "Approve reading message content", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+" }, action: "require_approval" },
+          { label: "Block attachments", match: { methods: ["GET"], urlPattern: "^/messages/[^/]+/attachments" }, action: "deny" },
+          { label: "Block sending", match: { methods: ["POST"], urlPattern: "^/messages/send" }, action: "deny" },
+          { label: "Block reply/forward", match: { methods: ["POST"], urlPattern: "^/messages/[^/]+/(reply|forward)" }, action: "deny" },
+          { label: "Block deletes", match: { methods: ["DELETE"] }, action: "deny" },
+          { label: "Approve all other writes", match: { methods: ["POST", "PUT", "PATCH"] }, action: "require_approval" },
+        ],
+        response: [PII_REDACT_RULE],
+      },
+    },
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Rate-limit labels (shown in preset cards)
@@ -3266,6 +3375,8 @@ export const RULE_PRESETS_BY_SERVICE: Record<string, Record<Exclude<RulePresetId
   notion: withRateLimits(notionManagePresets(), READ_RATES),
   trello: withRateLimits(trelloManagePresets(), READ_RATES),
   jira: withRateLimits(jiraManagePresets(), READ_RATES),
+  // Email (IMAP/SMTP)
+  "email-imap": withRateLimits(emailImapPresets(), READ_RATES),
 };
 
 /**
