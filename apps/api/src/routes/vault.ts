@@ -3656,7 +3656,7 @@ export async function executeModelBRequest(
     }
     const result = await handleEmailRequest(method, url, requestBody, emailCreds, connectionId, log ?? fastify.log);
     const responseJson = JSON.stringify(result.body);
-    logExecutionCompleted(sub, policy.agentId, connectionId, {
+    const { auditId } = logExecutionCompleted(sub, policy.agentId, connectionId, {
       model: "B",
       method,
       path: new URL(url).pathname,
@@ -3664,7 +3664,16 @@ export async function executeModelBRequest(
       dataSize: Buffer.byteLength(responseJson, "utf8"),
       provider: connection.provider,
     });
-    return reply.code(result.status).send(result.body);
+    // Wrap in the standard vault execute response format so agents see
+    // { model, status, headers, body, auditId } consistently.
+    const httpStatus = result.status >= 200 && result.status < 300 ? 200 : result.status;
+    return reply.code(httpStatus).send({
+      model: "B",
+      status: result.status,
+      headers: { "content-type": "application/json" },
+      body: result.body,
+      auditId,
+    });
   }
 
   // Get the access token — for Telegram, use bot token; for API key providers, use API key; for OAuth, refresh first
