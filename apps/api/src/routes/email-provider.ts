@@ -155,7 +155,7 @@ export async function handleEmailRequest(
       }
       if (method === "GET" && subpath.startsWith("/attachments/")) {
         const partId = subpath.slice("/attachments/".length);
-        return await handleDownloadAttachment(client, folder, uid, partId, log);
+        return await handleDownloadAttachment(client, folder, uid, partId, log, options);
       }
       if (method === "POST" && subpath === "/reply") {
         return await handleReplyMessage(client, credentials, folder, uid, body as Record<string, unknown>, log);
@@ -440,6 +440,7 @@ async function handleDownloadAttachment(
   uid: number,
   partId: string,
   log: FastifyBaseLogger,
+  options?: { download?: boolean },
 ): Promise<EmailResult> {
   const lock = await client.getMailboxLock(folder);
 
