@@ -207,7 +207,7 @@ function buildConfig(raw: Record<string, unknown>): OpenClawPluginConfig {
  * Instead we build plain objects that match the expected shape — OpenClaw's
  * loader coerces them via its own adapter.
  */
-function buildVaultTools(client: VaultClient, config: OpenClawPluginConfig) {
+function buildVaultTools(client: VaultClient, config: OpenClawPluginConfig, stateDir?: string) {
   return [
     {
       name: "vault_execute",
@@ -412,6 +412,156 @@ function buildVaultTools(client: VaultClient, config: OpenClawPluginConfig) {
           connectionId: params.connectionId as string,
         });
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      },
+    },
+    {
+      name: "vault_download",
+      label: "Vault Download",
+      description:
+        "Download a binary file through the AgentHiFive vault and save it to disk. " +
+        "Returns the local file path. Use for attachments (Gmail, IMAP), Drive files, images, and any binary content. " +
+        "The vault handles authentication, base64 decoding (for Gmail/IMAP attachments), and policy enforcement. " +
+        "Do NOT use vault_execute for binary downloads — the base64 data is too large for your context.",
+      parameters: Type.Object({
+        connectionId: Type.Optional(Type.String({ description: "Connection UUID (for multi-account services like Google, Microsoft)" })),
+        service: Type.Optional(Type.String({ description: "Service ID for singleton services (e.g., 'telegram', 'email-imap')" })),
+        url: Type.String({ description: "Provider API URL to download from (e.g., Gmail attachment URL, Drive file URL, IMAP attachment path)" }),
+        headers: Type.Optional(Type.Record(Type.String(), Type.String(), { description: "Additional headers (do NOT add Authorization)" })),
+        filename: Type.Optional(Type.String({ description: "Suggested filename (e.g., 'report.pdf'). If omitted, extracted from response headers or URL." })),
+        approvalId: Type.Optional(Type.String({ description: "Approval ID from a previous step-up approval" })),
+      }),
+      execute: async (
+        _toolCallId: string,
+        params: Record<string, unknown>,
+      ) => {
+        const connectionId = params.connectionId as string | undefined;
+        const service = params.service as string | undefined;
+        const url = params.url as string;
+        const suggestedFilename = params.filename as string | undefined;
+        const approvalId = params.approvalId as string | undefined;
+
+        if (!service && !connectionId) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            success: false,
+            error: "Either 'service' or 'connectionId' must be provided.",
+          }) }] };
+        }
+
+        const vaultBody: Record<string, unknown> = {
+          model: "B",
+          method: "GET",
+          url,
+          download: true,
+        };
+        if (connectionId) vaultBody.connectionId = connectionId;
+        if (service) vaultBody.service = service;
+        if (approvalId) vaultBody.approvalId = approvalId;
+        if (params.headers) vaultBody.headers = params.headers;
+
+        try {
+          const response = await client.postRaw("/v1/vault/execute", vaultBody);
+
+          // Step-up approval required
+          if (response.status === 202) {
+            const result = await response.json() as Record<string, unknown>;
+            if (result.approvalRequired && typeof result.approvalRequestId === "string") {
+              const sessionCtx = getCurrentSessionContext();
+              const pending: import("./pending-approvals.js").PendingApproval = {
+                approvalRequestId: result.approvalRequestId,
+                method: "GET",
+                url,
+                summary: `Download ${suggestedFilename ?? url}`,
+                createdAt: new Date().toISOString(),
+              };
+              if (typeof result.expiresAt === "string") pending.expiresAt = result.expiresAt;
+              if (service) pending.service = service;
+              if (connectionId) pending.connectionId = connectionId;
+              if (sessionCtx?.sessionKey) pending.sessionKey = sessionCtx.sessionKey;
+              if (sessionCtx?.channel) pending.channel = sessionCtx.channel;
+              if (sessionCtx?.peerId) pending.peerId = sessionCtx.peerId;
+              if (sessionCtx?.peerKind) pending.peerKind = sessionCtx.peerKind;
+              addPendingApproval(pending);
+            }
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+              success: false,
+              approvalRequired: true,
+              approvalRequestId: result.approvalRequestId,
+              hint: result.hint ?? "This download requires human approval.",
+            }) }] };
+          }
+
+          // Auth error
+          if (response.status === 401) {
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+              success: false,
+              error: "Vault authentication failed — token may be expired.",
+            }) }] };
+          }
+
+          // Other errors (vault returns JSON)
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+              success: false,
+              error: result.error ?? `Vault returned ${response.status}`,
+              hint: result.hint,
+            }) }] };
+          }
+
+          // Success — binary response. Save to disk.
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          if (buffer.byteLength === 0) {
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+              success: false,
+              error: "Download returned empty response.",
+            }) }] };
+          }
+
+          const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+          const contentDisposition = response.headers.get("content-disposition");
+
+          // Resolve filename: param > Content-Disposition > URL basename
+          let resolvedFilename = suggestedFilename;
+          if (!resolvedFilename && contentDisposition) {
+            const match = /filename\*?\s*=\s*(?:UTF-8''|")?([^";]+)/i.exec(contentDisposition);
+            if (match?.[1]) {
+              try { resolvedFilename = decodeURIComponent(match[1].replace(/["']/g, "")); } catch { /* ignore */ }
+            }
+          }
+          if (!resolvedFilename) {
+            try {
+              const base = new URL(url).pathname.split("/").pop();
+              if (base && base !== "/") resolvedFilename = base;
+            } catch { /* ignore */ }
+          }
+          if (!resolvedFilename) resolvedFilename = `download-${Date.now()}`;
+
+          // Save to workspace/downloads/
+          const { join } = await import("node:path");
+          const { writeFileSync, mkdirSync } = await import("node:fs");
+          const { homedir } = await import("node:os");
+          const baseDir = stateDir ?? join(homedir(), ".openclaw");
+          const downloadDir = join(baseDir, "workspace", "downloads");
+          mkdirSync(downloadDir, { recursive: true });
+          const filePath = join(downloadDir, resolvedFilename);
+          writeFileSync(filePath, buffer);
+
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            success: true,
+            path: filePath,
+            filename: resolvedFilename,
+            contentType,
+            sizeBytes: buffer.byteLength,
+          }) }] };
+
+        } catch (error) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            success: false,
+            error: `Download failed: ${error instanceof Error ? error.message : String(error)}`,
+          }) }] };
+        }
       },
     },
   ];
@@ -903,7 +1053,7 @@ export function registerAgentHiFivePlugin(api: any): void {
   initChannelLifecycleEvents(stateDir, logger);
 
   // ── Register tools ──────────────────────────────────────────────────────
-  const tools = buildVaultTools(client, config);
+  const tools = buildVaultTools(client, config, stateDir);
   for (const tool of tools) {
     api.registerTool(tool);
   }

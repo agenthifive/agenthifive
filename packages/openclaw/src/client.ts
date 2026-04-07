@@ -127,6 +127,21 @@ export class VaultClient {
     return this.handleResponse<T>(response);
   }
 
+  /**
+   * POST with raw Response returned (for download: true requests that return binary).
+   * Caller is responsible for checking response.ok and reading the body.
+   */
+  async postRaw(path: string, body?: unknown): Promise<Response> {
+    const authHeader = await this.getAuthHeader();
+    const headers = this.buildHeaders(authHeader);
+    const init: RequestInit = { method: "POST", headers };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
+    return fetch(`${this.baseUrl}${path}`, init);
+  }
+
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
