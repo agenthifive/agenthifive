@@ -2024,6 +2024,42 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
           return reply.code(400).send({ ok: false, error: `No test implemented for provider: ${entry.provider}` });
         }
 
+        if (entry.credentialType === "email") {
+          const emailTokens = JSON.parse(decryptedJson) as {
+            email?: string;
+            imap?: { host: string; port: number; tls?: boolean; username: string; password: string };
+          };
+          if (!emailTokens.imap) {
+            return reply.code(400).send({ ok: false, error: "No IMAP credentials found", hint: "Reconnect to provide IMAP server details." });
+          }
+          const { host, port, tls, username, password } = emailTokens.imap;
+          try {
+            const { ImapFlow } = await import("imapflow");
+            const client = new ImapFlow({
+              host,
+              port,
+              secure: tls !== false,
+              auth: { user: username, pass: password },
+              logger: false as any,
+              tls: { rejectUnauthorized: false },
+            });
+            await client.connect();
+            const mailboxCount = (await client.list()).length;
+            await client.logout();
+            if (connection.status !== "healthy") {
+              db.update(connections).set({ status: "healthy", updatedAt: new Date() }).where(eq(connections.id, id))
+                .then(() => {}).catch((err) => request.log.error(err, "Failed to mark email connection healthy"));
+            }
+            request.log.info({ connectionId: id, provider: "email", healthy: true }, "conn.test.result");
+            return { ok: true, provider: "email", detail: `IMAP connected — ${mailboxCount} folder(s) found` };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "IMAP connection failed";
+            request.log.warn({ connectionId: id, provider: "email", err: msg }, "conn.test.email.failed");
+            await db.update(connections).set({ status: "needs_reauth", updatedAt: new Date() }).where(eq(connections.id, id));
+            return reply.code(400).send({ ok: false, error: `IMAP test failed: ${msg}`, hint: "Check your server settings and credentials." });
+          }
+        }
+
         if (entry.credentialType === "api_key") {
           // Anthropic can be connected via API key OR OAuth (setup token flow).
           // API key stores { apiKey }, OAuth stores { accessToken, refreshToken }.

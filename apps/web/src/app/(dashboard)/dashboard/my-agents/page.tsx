@@ -1145,8 +1145,8 @@ function ConnectionCard({
   const actionTemplate = primaryPolicy?.actionTemplateId
     ? getActionTemplate(primaryPolicy.actionTemplateId)
     : null;
-  const cardTitle = actionTemplate?.label
-    || connection.connectionLabel
+  const cardTitle = connection.connectionLabel
+    || actionTemplate?.label
     || serviceConfig?.displayName
     || connection.connectionService;
 
