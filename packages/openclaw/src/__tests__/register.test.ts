@@ -29,7 +29,7 @@ describe("register (plugin integration)", () => {
     assert.equal(typeof plugin.register, "function");
   });
 
-  it("registers 6 vault tools with bearer auth", () => {
+  it("registers 7 vault tools with bearer auth", () => {
     const registeredTools: { name: string }[] = [];
     const registeredHooks: { event: string; handler: Function }[] = [];
     const logs: string[] = [];
@@ -58,11 +58,12 @@ describe("register (plugin integration)", () => {
 
     plugin.register(mockApi);
 
-    // Verify 6 tools registered
-    assert.equal(registeredTools.length, 6);
+    // Verify 7 tools registered
+    assert.equal(registeredTools.length, 7);
 
     const toolNames = registeredTools.map((t) => t.name);
     assert.ok(toolNames.includes("vault_execute"));
+    assert.ok(toolNames.includes("vault_download"));
     assert.ok(toolNames.includes("request_permission"));
     assert.ok(toolNames.includes("request_capability"));
     assert.ok(toolNames.includes("vault_await_approval"));
@@ -291,7 +292,7 @@ describe("register (plugin integration)", () => {
 
     plugin.register(mockApi);
 
-    assert.equal(registeredTools.length, 6);
+    assert.equal(registeredTools.length, 7);
     assert.equal(logs.some((msg) => msg.includes("installed but not configured")), false);
   });
 
