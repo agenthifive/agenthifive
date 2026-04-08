@@ -209,20 +209,61 @@ export default async function policyRoutes(fastify: FastifyInstance) {
         };
       }
     } else {
-      // No template — use manual defaults
-      const defaultAllowlists = getDefaultAllowlistsForService(connection.service);
-      policyValues = {
-        agentId: body.agentId,
-        connectionId: body.connectionId,
-        allowedModels,
-        defaultMode: defaultMode as "read_only" | "read_write" | "custom",
-        stepUpApproval: stepUpApproval as "always" | "risk_based" | "never",
-        allowlists: defaultAllowlists,
-        rateLimits: null,
-        timeWindows: [],
-        rules: { request: [], response: [] },
-        securityPreset: body.securityPreset ?? null,
-      };
+      // No explicit template — try to resolve one from the connection's service.
+      // This handles cases where the dashboard creates a policy without sending
+      // actionTemplateId (e.g., the email connection flow).
+      const inferredTemplate = getActionTemplatesForService(connection.service)
+        .sort((a, b) => b.scopes.length - a.scopes.length)[0];
+
+      if (inferredTemplate && body.policyTier) {
+        try {
+          const policyConfig = generatePolicyFromTemplate(inferredTemplate.id, body.policyTier);
+          policyValues = {
+            agentId: body.agentId,
+            connectionId: body.connectionId,
+            actionTemplateId: inferredTemplate.id,
+            allowedModels,
+            defaultMode: defaultMode as "read_only" | "read_write" | "custom",
+            stepUpApproval: policyConfig.stepUpApproval,
+            allowlists: policyConfig.allowlists,
+            rateLimits: policyConfig.rateLimits,
+            timeWindows: policyConfig.timeWindows,
+            rules: policyConfig.rules,
+            securityPreset: body.securityPreset ?? body.policyTier ?? null,
+          };
+        } catch {
+          // Fall through to manual defaults
+          const defaultAllowlists = getDefaultAllowlistsForService(connection.service);
+          policyValues = {
+            agentId: body.agentId,
+            connectionId: body.connectionId,
+            actionTemplateId: inferredTemplate.id,
+            allowedModels,
+            defaultMode: defaultMode as "read_only" | "read_write" | "custom",
+            stepUpApproval: stepUpApproval as "always" | "risk_based" | "never",
+            allowlists: defaultAllowlists,
+            rateLimits: null,
+            timeWindows: [],
+            rules: { request: [], response: [] },
+            securityPreset: body.securityPreset ?? null,
+          };
+        }
+      } else {
+        // No template and no preset — use manual defaults
+        const defaultAllowlists = getDefaultAllowlistsForService(connection.service);
+        policyValues = {
+          agentId: body.agentId,
+          connectionId: body.connectionId,
+          allowedModels,
+          defaultMode: defaultMode as "read_only" | "read_write" | "custom",
+          stepUpApproval: stepUpApproval as "always" | "risk_based" | "never",
+          allowlists: defaultAllowlists,
+          rateLimits: null,
+          timeWindows: [],
+          rules: { request: [], response: [] },
+          securityPreset: body.securityPreset ?? null,
+        };
+      }
     }
 
     const [policy] = await db

@@ -13,6 +13,7 @@ import {
   type TimeWindow,
   type PolicyRules,
   type RequestRule,
+  type ResponseRule,
 } from "@agenthifive/contracts";
 
 interface PolicyTemplateData {
