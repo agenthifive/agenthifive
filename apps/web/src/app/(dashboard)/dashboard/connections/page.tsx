@@ -493,6 +493,8 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
+    // Scroll to top so the email form is visible (not scrolled to bottom)
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleBack() {

@@ -418,6 +418,7 @@ export const SERVICE_CATALOG: Record<ServiceId, ServiceCatalogEntry> = {
     singleton: false,
     credentialType: "email",
     allowedModels: ["B"],
+    docsPath: "/connections/email",
     scopes: [],
   },
 };
