@@ -27,16 +27,18 @@ export function startApprovalScrub(logger?: { info: (obj: unknown, msg?: string)
 
       // Scrub requestDetails on resolved approvals that are older than the threshold
       // and still have extra keys beyond method+url (jsonb_object_keys count > 2).
+      // Use raw column names in SET clause — Drizzle expands column refs as
+      // "table"."column" which PostgreSQL rejects in SET (only "column" allowed).
       const result = await db.execute(
         sql`UPDATE ${approvalRequests}
-            SET ${approvalRequests.requestDetails} = jsonb_build_object(
-                  'method', ${approvalRequests.requestDetails}->'method',
-                  'url', ${approvalRequests.requestDetails}->'url'
+            SET request_details = jsonb_build_object(
+                  'method', request_details->'method',
+                  'url', request_details->'url'
                 ),
-                ${approvalRequests.updatedAt} = now()
+                updated_at = now()
             WHERE status IN ('approved', 'denied', 'expired', 'consumed')
-              AND ${approvalRequests.updatedAt} < ${cutoff}
-              AND (SELECT count(*) FROM jsonb_object_keys(${approvalRequests.requestDetails})) > 2`,
+              AND updated_at < ${cutoff}
+              AND (SELECT count(*) FROM jsonb_object_keys(request_details)) > 2`,
       );
 
       const rowCount = (result as unknown as { rowCount?: number }).rowCount ?? 0;
