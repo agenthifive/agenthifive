@@ -896,6 +896,57 @@ export const POLICY_TEMPLATES: Record<string, Record<PolicyTier, PolicyTemplateW
       guards: [],
     },
   },
+
+  // ── Email (IMAP/SMTP) ──────────────────────────────────
+  "email-read": {
+    strict: {
+      tier: "strict",
+      name: "Strict",
+      description: "List folders and subjects only. Full content requires approval. Attachments blocked.",
+      icon: "🔒",
+      guards: ["cs-pii-redact"],
+    },
+    standard: {
+      tier: "standard",
+      name: "Standard",
+      description: "Read emails and folders. Attachments require approval. PII redacted.",
+      recommended: true,
+      icon: "🛡️",
+      guards: ["cs-pii-redact"],
+    },
+    minimal: {
+      tier: "minimal",
+      name: "Minimal",
+      description: "Unrestricted read access to emails and folders",
+      icon: "⚡",
+      guards: [],
+    },
+  },
+
+  "email-manage": {
+    strict: {
+      tier: "strict",
+      name: "Strict",
+      description: "Read subjects and folders. Full content, sending, and deleting require approval. Attachments blocked.",
+      icon: "🔒",
+      guards: ["cs-pii-redact"],
+    },
+    standard: {
+      tier: "standard",
+      name: "Standard",
+      description: "Read emails. Sending, attachments, moving, and deleting require approval. PII redacted.",
+      recommended: true,
+      icon: "🛡️",
+      guards: ["cs-pii-redact"],
+    },
+    minimal: {
+      tier: "minimal",
+      name: "Minimal",
+      description: "Full read, send, and manage access",
+      icon: "⚡",
+      guards: [],
+    },
+  },
 };
 
 /**

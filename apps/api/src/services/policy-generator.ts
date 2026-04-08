@@ -595,6 +595,16 @@ export function generatePolicyFromTemplate(
   // fallback in vault.ts is never reached for templated policies.
   rules.request.push(...getBaseRequestRules(actionTemplateId, tier));
 
+  // Append base response rules from presets (e.g., PII redaction).
+  // Guard-generated response rules take precedence; preset rules fill gaps.
+  const presetMap = getPresetsForActionTemplate(actionTemplateId);
+  if (presetMap) {
+    const preset = presetMap[tier === "standard" ? "standard" : tier === "strict" ? "strict" : "minimal"];
+    if (preset?.rules?.response?.length && rules.response.length === 0) {
+      rules.response.push(...(preset.rules.response as ResponseRule[]));
+    }
+  }
+
   // Field step-up: balanced contacts allow agents to request full PII via approval.
   // Strict explicitly disables it — PII is permanently stripped.
   // We always set the flag for contacts policies so that switching tiers
