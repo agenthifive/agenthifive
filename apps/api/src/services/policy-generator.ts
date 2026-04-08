@@ -421,6 +421,21 @@ function getAllowlistsForAction(actionTemplateId: string, tier: PolicyTier): All
       ],
       minimal: [{ baseUrl: "https://*.atlassian.net", methods: ["GET", "POST", "PUT", "DELETE"], pathPatterns: ["/rest/api/3/**"] }],
     },
+
+    // ── Email (IMAP/SMTP — virtual URL paths) ──
+    "email-read": {
+      strict: [{ baseUrl: "https://email-imap.internal", methods: ["GET"], pathPatterns: ["/folders", "/messages", "/messages/*"] }],
+      standard: [{ baseUrl: "https://email-imap.internal", methods: ["GET"], pathPatterns: ["/folders", "/folders/*", "/messages", "/messages/*", "/messages/*/attachments/*"] }],
+      minimal: [{ baseUrl: "https://email-imap.internal", methods: ["GET"], pathPatterns: ["/folders/**", "/messages/**"] }],
+    },
+    "email-manage": {
+      strict: [
+        { baseUrl: "https://email-imap.internal", methods: ["GET"], pathPatterns: ["/folders", "/messages", "/messages/*"] },
+        { baseUrl: "https://email-imap.internal", methods: ["POST"], pathPatterns: ["/messages/send", "/messages/*/reply", "/messages/*/forward"] },
+      ],
+      standard: [{ baseUrl: "https://email-imap.internal", methods: ["GET", "POST", "DELETE", "PATCH"], pathPatterns: ["/folders", "/folders/*", "/messages", "/messages/*", "/messages/send", "/messages/*/reply", "/messages/*/forward", "/messages/*/move", "/messages/*/copy", "/messages/*/flags", "/messages/*/attachments/*"] }],
+      minimal: [{ baseUrl: "https://email-imap.internal", methods: ["GET", "POST", "DELETE", "PATCH"], pathPatterns: ["/folders/**", "/messages/**"] }],
+    },
   };
 
   return allowlistMap[actionTemplateId]?.[tier] || [];

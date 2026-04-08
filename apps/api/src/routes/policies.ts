@@ -212,8 +212,12 @@ export default async function policyRoutes(fastify: FastifyInstance) {
       // No explicit template — try to resolve one from the connection's service.
       // This handles cases where the dashboard creates a policy without sending
       // actionTemplateId (e.g., the email connection flow).
-      const inferredTemplate = getActionTemplatesForService(connection.service)
-        .sort((a, b) => b.scopes.length - a.scopes.length)[0];
+      // Prefer *-manage over *-read when the connection has write scopes
+      const candidates = getActionTemplatesForService(connection.service);
+      const hasWrite = (connection.grantedScopes ?? []).some((s: string) => ["write", "smtp"].includes(s));
+      const inferredTemplate = hasWrite
+        ? candidates.find((t) => t.id.endsWith("-manage")) ?? candidates[0]
+        : candidates[0];
 
       if (inferredTemplate && body.policyTier) {
         try {
