@@ -977,7 +977,7 @@ export default function ConnectionsPage() {
             onClick={() => setStep("select")}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
-            Grant Permission
+            + Connect App
           </button>
         )}
       </div>
@@ -992,12 +992,12 @@ export default function ConnectionsPage() {
         <div className="mt-8">
           {connectionsLoading ? (
             <div className="rounded-lg border border-border bg-card p-8 text-center">
-              <p className="text-muted">Loading permissions...</p>
+              <p className="text-muted">Loading connections...</p>
             </div>
           ) : connectionsList.length === 0 ? (
             <div className="rounded-lg border border-border bg-card p-8 text-center">
               <p className="text-muted">
-                No permissions granted yet. Click &quot;Grant Permission&quot; to get
+                No connections yet. Click &quot;+ Connect App&quot; to get
                 started.
               </p>
             </div>
@@ -1531,14 +1531,11 @@ export default function ConnectionsPage() {
                             </div>
                           )}
                           {!actionHasConn && scopeLabels.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <div className="text-xs font-medium text-muted mb-1.5">
-                                Connector capabilities:
-                              </div>
-                              <div className="space-y-1">
+                            <div className="mt-2 pt-2 border-t border-border">
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                                 {scopeLabels.map((scopeLabel, idx) => (
-                                  <div key={idx} className="flex items-start gap-1.5 text-xs text-muted">
-                                    <span className="text-green-600 mt-0.5">✓</span>
+                                  <div key={idx} className="flex items-center gap-1 text-xs text-muted">
+                                    <span className="text-green-600">&#10003;</span>
                                     <span>{scopeLabel}</span>
                                   </div>
                                 ))}
@@ -1856,11 +1853,9 @@ export default function ConnectionsPage() {
       {step === "flow" && flowService && SERVICE_CATALOG[flowService].credentialType === "email" && (() => {
         const flowEntry = SERVICE_CATALOG[flowService];
 
-        const EMAIL_PRESETS: { name: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }[] = [
-          { name: "Gmail", imapHost: "imap.gmail.com", imapPort: 993, smtpHost: "smtp.gmail.com", smtpPort: 587 },
-          { name: "iCloud", imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587 },
+        const EMAIL_PRESETS: { name: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number; note?: string }[] = [
           { name: "Fastmail", imapHost: "imap.fastmail.com", imapPort: 993, smtpHost: "smtp.fastmail.com", smtpPort: 587 },
-          { name: "Yahoo", imapHost: "imap.mail.yahoo.com", imapPort: 993, smtpHost: "smtp.mail.yahoo.com", smtpPort: 587 },
+          { name: "iCloud", imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587, note: "Requires an app-specific password from appleid.apple.com" },
         ];
 
         function applyPreset(preset: { imapHost: string; imapPort: number; smtpHost: string; smtpPort: number }) {
@@ -1898,7 +1893,7 @@ export default function ConnectionsPage() {
             {!emailResult ? (
               <>
                 <p className="text-sm text-muted mb-4">
-                  Connect to any email account via IMAP and SMTP. Use an app-specific password for accounts with two-factor authentication.
+                  Connect to any email account via IMAP and SMTP. For Gmail and Outlook, use the OAuth connection instead. IMAP is for providers like Fastmail, iCloud, or self-hosted mail servers.
                 </p>
 
                 {/* Provider presets */}
