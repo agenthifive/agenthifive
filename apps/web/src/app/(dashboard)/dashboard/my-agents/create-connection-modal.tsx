@@ -232,6 +232,10 @@ export default function CreateConnectionModal({
       setFlowService(serviceId);
       setStep("flow");
       setError(null);
+      // Scroll the modal to top — email card is at the bottom of the list
+      setTimeout(() => {
+        document.querySelector(".overflow-y-auto")?.scrollTo(0, 0);
+      }, 100);
       return;
     }
 
