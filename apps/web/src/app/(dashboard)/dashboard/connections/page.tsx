@@ -493,8 +493,6 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
-    // Scroll to top so the email form is visible (not scrolled to bottom)
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleBack() {
@@ -1881,7 +1879,7 @@ export default function ConnectionsPage() {
         }
 
         return (
-        <div className="mt-8 max-w-xl">
+        <div className="mt-8 max-w-xl" ref={(el) => { if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" })); }}>
           <div className="mb-4 flex items-center gap-2">
             <button
               onClick={handleBack}
