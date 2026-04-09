@@ -493,6 +493,10 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
+    setTimeout(() => {
+      const el = document.getElementById("email-connection-form");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   function handleBack() {
@@ -1879,7 +1883,7 @@ export default function ConnectionsPage() {
         }
 
         return (
-        <div className="mt-8 max-w-xl" ref={(el) => { if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" })); }}>
+        <div id="email-connection-form" className="mt-8 max-w-xl">
           <div className="mb-4 flex items-center gap-2">
             <button
               onClick={handleBack}
