@@ -493,12 +493,17 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
-    // The email card is at the bottom of the service list. When step changes
-    // to "flow", the list is replaced by the form — scroll everything to top.
-    // Wait for React to render the flow content before scrolling
+    console.log("[AH5-scroll-v2] handleSelectEmail called");
     setTimeout(() => {
-      document.querySelector(".overflow-y-auto")?.scrollTo(0, 0);
-    }, 300);
+      const el = document.querySelector(".overflow-y-auto");
+      console.log("[AH5-scroll-v2] timeout fired, container:", el?.tagName, el?.className?.slice(0, 60), "scrollTop:", el?.scrollTop);
+      if (el) {
+        el.scrollTop = 0;
+        console.log("[AH5-scroll-v2] set scrollTop=0, now:", el.scrollTop);
+      } else {
+        console.log("[AH5-scroll-v2] no .overflow-y-auto found");
+      }
+    }, 500);
   }
 
   function handleBack() {
