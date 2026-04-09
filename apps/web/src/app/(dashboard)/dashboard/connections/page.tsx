@@ -1192,11 +1192,12 @@ export default function ConnectionsPage() {
 
                         {/* Footer */}
                         <div className="flex items-center justify-between gap-2 pt-2 mt-auto border-t border-border">
-                          <div className="text-xs text-muted whitespace-nowrap">
-                            {new Date(conn.createdAt).toLocaleDateString(
+                          <div className="text-xs text-muted whitespace-nowrap flex items-center gap-2">
+                            <span>{new Date(conn.createdAt).toLocaleDateString(
                               undefined,
                               { day: "numeric", month: "short", year: "numeric" },
-                            )}
+                            )}</span>
+                            <span className="font-mono opacity-60" title="Connection ID">{conn.id.slice(0, 8)}…</span>
                           </div>
                           <div className="flex items-center gap-3">
                             <button

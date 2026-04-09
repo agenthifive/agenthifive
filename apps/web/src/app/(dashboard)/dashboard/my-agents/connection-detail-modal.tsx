@@ -448,6 +448,8 @@ export default function ConnectionDetailModal({
                         <span>Connected {new Date(connection.connectionCreatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
                         <span>•</span>
                         <span className="capitalize">{connection.connectionProvider}</span>
+                        <span>•</span>
+                        <span className="font-mono opacity-60" title="Connection ID">{connection.connectionId.slice(0, 8)}…</span>
                       </div>
                     </div>
                     {/* Actions */}

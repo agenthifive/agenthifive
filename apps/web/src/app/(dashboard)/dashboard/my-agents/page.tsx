@@ -531,6 +531,9 @@ export default function MyAgentsPage() {
                         <span>
                           Created: {new Date(agent.createdAt).toLocaleDateString()}
                         </span>
+                        <span className="font-mono opacity-60" title="Agent ID">
+                          {agent.id.slice(0, 8)}…
+                        </span>
                       </div>
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-2">
