@@ -82,6 +82,7 @@ interface ConnectionPolicy {
   defaultMode: "read_only" | "read_write" | "custom";
   stepUpApproval: "always" | "risk_based" | "never";
   allowedModels: string[];
+  securityPreset?: string | null;
 }
 
 interface Connection {
@@ -130,23 +131,32 @@ function formatScope(scope: string): string {
 function getConnectionProtectionStatus(conn: Connection) {
   const hasPolicy = conn.policies.length > 0;
   if (!hasPolicy) {
-    return { headline: "\u26a0\ufe0f No rules set", subtitle: "No security policy configured" };
+    return { headline: "⚠️ No rules set", subtitle: "No security policy configured" };
   }
 
   const primary = conn.policies[0]!;
+  const preset = primary.securityPreset;
+
+  // Use securityPreset when available (rules-based policies set stepUpApproval to "never")
+  if (preset === "strict") {
+    return { headline: "🔒 Strict Protection", subtitle: "Maximum oversight · Sensitive actions blocked or require approval" };
+  }
+  if (preset === "standard") {
+    return { headline: "🛡️ Balanced Protection", subtitle: "Reads allowed · Writes and sensitive actions need approval" };
+  }
+  if (preset === "minimal") {
+    return { headline: "⚠️ Minimal Protection", subtitle: "Full access · No approval required" };
+  }
+
+  // Fallback for policies without securityPreset (legacy or custom)
   const hasApproval = primary.stepUpApproval === "always" || primary.stepUpApproval === "risk_based";
   const isReadOnly = primary.defaultMode === "read_only";
 
   let headline: string;
-  if (isReadOnly && hasApproval) {
-    headline = "\ud83d\udd12 Strict Protection";
-  } else if (hasApproval) {
-    headline = "\ud83d\udee1\ufe0f Balanced Protection";
-  } else if (isReadOnly) {
-    headline = "\ud83d\udee1\ufe0f Read-Only";
-  } else {
-    headline = "\u26a0\ufe0f Minimal Protection";
-  }
+  if (isReadOnly && hasApproval) headline = "🔒 Strict Protection";
+  else if (hasApproval) headline = "🛡️ Balanced Protection";
+  else if (isReadOnly) headline = "🛡️ Read-Only";
+  else headline = "⚠️ Minimal Protection";
 
   const parts: string[] = [];
   if (isReadOnly) parts.push("Read-only access");
@@ -155,7 +165,7 @@ function getConnectionProtectionStatus(conn: Connection) {
   else if (primary.stepUpApproval === "risk_based") parts.push("Risky writes need approval");
   else parts.push("No approval required");
 
-  return { headline, subtitle: parts.join(" \u00b7 ") };
+  return { headline, subtitle: parts.join(" · ") };
 }
 
 export default function ConnectionsPage() {
@@ -1113,9 +1123,16 @@ export default function ConnectionsPage() {
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
-                              <h4 className="font-semibold text-sm text-foreground truncate">
-                                {conn.label}
-                              </h4>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <h4 className="font-semibold text-sm text-foreground truncate">
+                                  {conn.label}
+                                </h4>
+                                {serviceConfig?.docsPath && (
+                                  <HelpTooltip docsPath={serviceConfig.docsPath}>
+                                    {serviceConfig.description}
+                                  </HelpTooltip>
+                                )}
+                              </div>
                               <span
                                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ${statusConfig.bg} ${statusConfig.color}`}
                               >
