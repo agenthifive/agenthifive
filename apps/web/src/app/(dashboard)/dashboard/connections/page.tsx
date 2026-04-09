@@ -493,9 +493,15 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
+    // The email card is at the bottom of the service list. When step changes
+    // to "flow", the list is replaced by the form — scroll everything to top.
     setTimeout(() => {
-      const el = document.getElementById("email-connection-form");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      // Also try the main content container
+      document.querySelector("main")?.scrollTo(0, 0);
+      document.querySelector("[role='main']")?.scrollTo(0, 0);
     }, 50);
   }
 
