@@ -496,12 +496,9 @@ export default function ConnectionsPage() {
     // The email card is at the bottom of the service list. When step changes
     // to "flow", the list is replaced by the form — scroll everything to top.
     setTimeout(() => {
+      // The connection detail modal uses overflow-y-auto — scroll it to top
+      document.querySelector(".overflow-y-auto")?.scrollTo(0, 0);
       window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      // Also try the main content container
-      document.querySelector("main")?.scrollTo(0, 0);
-      document.querySelector("[role='main']")?.scrollTo(0, 0);
     }, 50);
   }
 
