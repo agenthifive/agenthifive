@@ -531,8 +531,12 @@ export default function MyAgentsPage() {
                         <span>
                           Created: {new Date(agent.createdAt).toLocaleDateString()}
                         </span>
-                        <span className="font-mono opacity-60" title="Agent ID">
-                          {agent.id.slice(0, 8)}…
+                        <span
+                          className="font-mono text-muted cursor-pointer hover:text-foreground transition-colors"
+                          title={`Agent ID: ${agent.id} (click to copy)`}
+                          onClick={() => { navigator.clipboard.writeText(agent.id); }}
+                        >
+                          ID: {agent.id.slice(0, 8)}…
                         </span>
                       </div>
                     </div>

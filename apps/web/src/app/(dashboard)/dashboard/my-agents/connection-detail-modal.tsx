@@ -449,7 +449,11 @@ export default function ConnectionDetailModal({
                         <span>•</span>
                         <span className="capitalize">{connection.connectionProvider}</span>
                         <span>•</span>
-                        <span className="font-mono opacity-60" title="Connection ID">{connection.connectionId.slice(0, 8)}…</span>
+                        <span
+                          className="font-mono cursor-pointer hover:text-foreground transition-colors"
+                          title={`Connection ID: ${connection.connectionId} (click to copy)`}
+                          onClick={() => { navigator.clipboard.writeText(connection.connectionId); }}
+                        >ID: {connection.connectionId.slice(0, 8)}…</span>
                       </div>
                     </div>
                     {/* Actions */}

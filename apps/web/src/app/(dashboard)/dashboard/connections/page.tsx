@@ -1197,7 +1197,11 @@ export default function ConnectionsPage() {
                               undefined,
                               { day: "numeric", month: "short", year: "numeric" },
                             )}</span>
-                            <span className="font-mono opacity-60" title="Connection ID">{conn.id.slice(0, 8)}…</span>
+                            <span
+                              className="font-mono cursor-pointer hover:text-foreground transition-colors"
+                              title={`Connection ID: ${conn.id} (click to copy)`}
+                              onClick={() => { navigator.clipboard.writeText(conn.id); }}
+                            >ID: {conn.id.slice(0, 8)}…</span>
                           </div>
                           <div className="flex items-center gap-3">
                             <button
