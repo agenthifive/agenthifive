@@ -126,6 +126,38 @@ function formatScope(scope: string): string {
   return scope;
 }
 
+/** Derive a protection status headline + subtitle from connection policies */
+function getConnectionProtectionStatus(conn: Connection) {
+  const hasPolicy = conn.policies.length > 0;
+  if (!hasPolicy) {
+    return { headline: "\u26a0\ufe0f No rules set", subtitle: "No security policy configured" };
+  }
+
+  const primary = conn.policies[0]!;
+  const hasApproval = primary.stepUpApproval === "always" || primary.stepUpApproval === "risk_based";
+  const isReadOnly = primary.defaultMode === "read_only";
+
+  let headline: string;
+  if (isReadOnly && hasApproval) {
+    headline = "\ud83d\udd12 Strict Protection";
+  } else if (hasApproval) {
+    headline = "\ud83d\udee1\ufe0f Balanced Protection";
+  } else if (isReadOnly) {
+    headline = "\ud83d\udee1\ufe0f Read-Only";
+  } else {
+    headline = "\u26a0\ufe0f Minimal Protection";
+  }
+
+  const parts: string[] = [];
+  if (isReadOnly) parts.push("Read-only access");
+  else parts.push("Read/write access");
+  if (primary.stepUpApproval === "always") parts.push("All writes need approval");
+  else if (primary.stepUpApproval === "risk_based") parts.push("Risky writes need approval");
+  else parts.push("No approval required");
+
+  return { headline, subtitle: parts.join(" \u00b7 ") };
+}
+
 export default function ConnectionsPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -1036,26 +1068,20 @@ export default function ConnectionsPage() {
                 {getConnectionsByProvider().map(({ service, displayName, icon, connections }) => (
                   <div
                     key={service}
-                    className="rounded-xl border-2 border-blue-200/50 bg-gradient-to-br from-blue-50 via-purple-50 to-blue-50 p-6 shadow-lg"
+                    className="space-y-3"
                   >
                     {/* Service Header */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg ring-4 ring-blue-300 ring-opacity-50 shadow-md">
-                        {icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-bold text-foreground">{displayName}</h3>
-                          {isSingleton(service) && (
-                            <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700 border border-purple-300">
-                              🔒 One per workspace
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted">
-                          {connections.length} {connections.length === 1 ? "connection" : "connections"}
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{icon}</span>
+                      <h3 className="text-sm font-semibold text-foreground">{displayName}</h3>
+                      <span className="text-xs text-muted">
+                        {connections.length} {connections.length === 1 ? "connection" : "connections"}
+                      </span>
+                      {isSingleton(service) && (
+                        <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                          One per workspace
+                        </span>
+                      )}
                     </div>
 
                     {/* Connection Cards */}
@@ -1069,267 +1095,125 @@ export default function ConnectionsPage() {
                   return (
                     <div
                       key={conn.id}
-                      className="rounded-lg border border-border bg-card p-5"
+                      className={`group rounded-lg border border-border bg-white overflow-hidden hover:shadow-lg hover:border-blue-400 transition-all flex flex-col ${
+                        conn.status === "healthy"
+                          ? "border-t-4 border-t-green-200"
+                          : conn.status === "needs_reauth"
+                            ? "border-t-4 border-t-yellow-200"
+                            : conn.status === "revoked"
+                              ? "border-t-4 border-t-red-200"
+                              : ""
+                      }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-lg">
+                      <div className="p-3 flex-1 flex flex-col">
+                        {/* Header: Icon, Name, Status */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl flex-shrink-0">
                             {serviceConfig?.icon ?? conn.service[0]?.toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-foreground">
-                              {conn.label}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-semibold text-sm text-foreground truncate">
+                                {conn.label}
+                              </h4>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ${statusConfig.bg} ${statusConfig.color}`}
+                              >
+                                {statusConfig.label}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted">
-                              {serviceConfig?.displayName ?? conn.service}
+                          </div>
+                        </div>
+
+                        {/* Agent bindings */}
+                        {conn.policies && conn.policies.length > 0 && (
+                          <div className="mb-2">
+                            <div className="flex flex-wrap gap-1">
+                              {conn.policies.map((policy) => (
+                                <span
+                                  key={policy.id}
+                                  className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700"
+                                >
+                                  <span>🤖</span> {policy.agentName}
+                                </span>
+                              ))}
                             </div>
                           </div>
-                        </div>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}
-                        >
-                          {statusConfig.label}
-                        </span>
-                      </div>
+                        )}
 
-                      {/* Granted scopes */}
-                      <div className="mt-4">
-                        <div className="text-xs font-medium uppercase tracking-wide text-muted mb-1.5">
-                          Granted Permissions
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {conn.grantedScopes.map((scope) => (
-                            <span
-                              key={scope}
-                              className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
-                              title={scope}
-                            >
-                              {formatScope(scope)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Authorized Agents and Policies */}
-                      {conn.policies && conn.policies.length > 0 && (
-                        <div className="mt-4 rounded-lg bg-blue-50 border border-blue-200 p-3">
-                          <div className="text-xs font-medium uppercase tracking-wide text-blue-900 mb-2">
-                            Authorized Agents
-                          </div>
-                          {conn.policies.map((policy) => (
-                            <div key={policy.id} className="mb-2 last:mb-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-lg">🤖</span>
-                                <span className="text-sm font-semibold text-foreground">
-                                  {policy.agentName}
+                        {/* Protection Status */}
+                        {(() => {
+                          const protectionStatus = getConnectionProtectionStatus(conn);
+                          return (
+                            <div className="mb-2">
+                              <div className="mb-1">
+                                <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                                  protectionStatus.headline.includes("\u26a0\ufe0f")
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}>
+                                  {protectionStatus.headline}
                                 </span>
                               </div>
-                              <div className="ml-7 space-y-1">
-                                <div className="flex items-center gap-2 text-xs">
-                                  <span className="text-muted">Mode:</span>
-                                  <span className={`inline-flex rounded px-2 py-0.5 font-medium ${
-                                    policy.defaultMode === "read_only"
-                                      ? "bg-green-100 text-green-700"
-                                      : policy.defaultMode === "read_write"
-                                      ? "bg-yellow-100 text-yellow-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}>
-                                    {policy.defaultMode === "read_only"
-                                      ? "Read Only"
-                                      : policy.defaultMode === "read_write"
-                                      ? "Read/Write"
-                                      : "Custom"}
-                                  </span>
-                                </div>
-                                <div className="text-xs">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-muted">Approval:</span>
-                                    <span className="text-foreground">
-                                      {policy.stepUpApproval === "always"
-                                        ? "Always Required"
-                                        : policy.stepUpApproval === "risk_based"
-                                        ? "Risk-Based"
-                                        : "Never Required"}
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 ml-16">
-                                    {policy.stepUpApproval === "always" && "Every operation requires your approval"}
-                                    {policy.stepUpApproval === "risk_based" && "High-risk operations require your approval"}
-                                    {policy.stepUpApproval === "never" && "No approval required for operations"}
-                                  </div>
-                                </div>
-                                <div className="text-xs">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-muted">Models:</span>
-                                    <span className="text-foreground font-mono">
-                                      {policy.allowedModels.join(", ")}
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 ml-16 space-y-0.5">
-                                    {policy.allowedModels.includes("A") && (
-                                      <div>• Model A: Agent gets temporary tokens for direct access</div>
-                                    )}
-                                    {policy.allowedModels.includes("B") && (
-                                      <div>• Model B: All requests routed through AgentHiFive proxy</div>
-                                    )}
-                                  </div>
-                                </div>
-                              <div className="mt-1.5">
-                                <Link
-                                  href="/dashboard/my-agents"
-                                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                                >
-                                  Security settings →
-                                </Link>
-                              </div>
-                              </div>
+                              <p className="text-xs text-muted leading-tight">
+                                {protectionStatus.subtitle}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          );
+                        })()}
 
-                      {/* Microsoft Teams account info */}
-                      {conn.service === "microsoft-teams" && conn.metadata && (() => {
-                        const msMeta = conn.metadata as MicrosoftMetadata;
-                        return (
-                        <div className="mt-3">
-                          {msMeta.email && (
-                            <div className="text-xs text-muted mb-1">
-                              Account: {msMeta.email}
-                              {msMeta.displayName &&
-                                msMeta.displayName !== msMeta.email && (
-                                <span> ({msMeta.displayName})</span>
-                              )}
-                            </div>
-                          )}
-                          {msMeta.tenantId && (
-                            <div className="text-xs text-muted mb-2">
-                              Tenant: <span className="font-mono">{msMeta.tenantId}</span>
-                            </div>
-                          )}
-                          <div className="text-xs text-muted">
-                            Chat and channel restrictions are managed via policy provider constraints.
+                        {/* Test result */}
+                        {testResult?.id === conn.id && (
+                          <div className={`mt-2 rounded-md p-2 text-xs ${
+                            testResult.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+                          }`}>
+                            {testResult.ok
+                              ? `\u2713 ${testResult.detail}`
+                              : `\u2717 ${testResult.error}${testResult.hint ? ` \u2014 ${testResult.hint}` : ""}`}
                           </div>
-                        </div>
-                        );
-                      })()}
+                        )}
 
-                      {/* Telegram bot info */}
-                      {conn.service === "telegram" && conn.metadata && (() => {
-                        const tgMeta = conn.metadata as TelegramMetadata;
-                        return (
-                        <div className="mt-3">
-                          {tgMeta.botUsername && (
-                            <div className="text-xs text-muted mb-1">
-                              Bot: @{tgMeta.botUsername}{" "}
-                              {tgMeta.botFirstName && (
-                                <span>({tgMeta.botFirstName})</span>
-                              )}
-                            </div>
-                          )}
-                          <div className="text-xs text-muted">
-                            Chat restrictions are managed via policy provider constraints.
+                        {/* Footer */}
+                        <div className="flex items-center justify-between gap-2 pt-2 mt-auto border-t border-border">
+                          <div className="text-xs text-muted whitespace-nowrap">
+                            {new Date(conn.createdAt).toLocaleDateString(
+                              undefined,
+                              { day: "numeric", month: "short", year: "numeric" },
+                            )}
                           </div>
-                        </div>
-                        );
-                      })()}
-
-                      {conn.credentialPreview && (
-                        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-                          <div className="text-xs text-slate-700">
-                            {conn.credentialPreview.primaryLabel}: <span className="font-mono">{conn.credentialPreview.primaryMasked}</span>
-                          </div>
-                          {conn.credentialPreview.secondaryLabel && conn.credentialPreview.secondaryMasked && (
-                            <div className="mt-1 text-xs text-slate-700">
-                              {conn.credentialPreview.secondaryLabel}: <span className="font-mono">{conn.credentialPreview.secondaryMasked}</span>
-                            </div>
-                          )}
-                          {conn.credentialPreview.tertiaryLabel && conn.credentialPreview.tertiaryValue && (
-                            <div className="mt-1 text-xs text-slate-700">
-                              {conn.credentialPreview.tertiaryLabel}: <span>{conn.credentialPreview.tertiaryValue}</span>
-                            </div>
-                          )}
-                          {conn.updatedAt && (
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              Updated {new Date(conn.updatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Reconnect prompt for needs_reauth connections */}
-                      {conn.status === "needs_reauth" && (
-                        <div className="mt-3 rounded-md bg-yellow-50 border border-yellow-200 p-3">
-                          <p className="text-xs text-yellow-800">
-                            This connection needs to be reconnected. Existing policies and settings will be preserved.
-                          </p>
-                          <button
-                            onClick={() => setReauthTarget(conn)}
-                            className="mt-2 rounded-md bg-yellow-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-yellow-700"
-                          >
-                            Reconnect
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Test result */}
-                      {testResult?.id === conn.id && (
-                        <div className={`mt-2 rounded-md p-2 text-xs ${
-                          testResult.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
-                        }`}>
-                          {testResult.ok
-                            ? `\u2713 ${testResult.detail}`
-                            : `\u2717 ${testResult.error}${testResult.hint ? ` — ${testResult.hint}` : ""}`}
-                        </div>
-                      )}
-
-                      {/* Footer: date + test + revoke buttons */}
-                      <div className="mt-3 flex items-center justify-between">
-                        <div className="text-xs text-muted">
-                          Connected{" "}
-                          {new Date(conn.createdAt).toLocaleDateString(
-                            undefined,
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            },
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {conn.credentialPreview && conn.status === "healthy" && (
+                          <div className="flex items-center gap-3">
                             <button
                               onClick={() => setReauthTarget(conn)}
-                              className="rounded px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                              className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors whitespace-nowrap"
                             >
-                              Update credential
+                              Settings
                             </button>
-                          )}
-                          {!conn.credentialPreview && SERVICE_CATALOG[conn.service as ServiceId]?.credentialType === "oauth" && conn.status === "healthy" && (
-                            <button
-                              onClick={() => setReauthTarget(conn)}
-                              className="rounded px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-                            >
-                              Reconnect
-                            </button>
-                          )}
-                          {conn.status !== "revoked" && (
-                            <button
-                              onClick={() => handleTestConnection(conn.id)}
-                              disabled={testingConnectionId === conn.id}
-                              className="rounded px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {testingConnectionId === conn.id ? "Testing..." : "Test"}
-                            </button>
-                          )}
-                          {conn.status !== "revoked" && (
-                            <button
-                              onClick={() => setRevokeTarget(conn)}
-                              className="rounded px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
-                            >
-                              Revoke
-                            </button>
-                          )}
+                            {conn.status !== "revoked" && (
+                              <button
+                                onClick={() => handleTestConnection(conn.id)}
+                                disabled={testingConnectionId === conn.id}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {testingConnectionId === conn.id ? "Testing..." : "Test"}
+                              </button>
+                            )}
+                            {conn.status === "needs_reauth" && (
+                              <button
+                                onClick={() => setReauthTarget(conn)}
+                                className="text-xs font-medium text-yellow-600 hover:text-yellow-700 transition-colors whitespace-nowrap"
+                              >
+                                Reconnect
+                              </button>
+                            )}
+                            {conn.status !== "revoked" && (
+                              <button
+                                onClick={() => setRevokeTarget(conn)}
+                                className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors whitespace-nowrap"
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
