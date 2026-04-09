@@ -493,17 +493,9 @@ export default function ConnectionsPage() {
     setFlowService(serviceId);
     setStep("flow");
     setError(null);
-    console.log("[AH5-scroll-v2] handleSelectEmail called");
     setTimeout(() => {
-      const el = document.querySelector(".overflow-y-auto");
-      console.log("[AH5-scroll-v2] timeout fired, container:", el?.tagName, el?.className?.slice(0, 60), "scrollTop:", el?.scrollTop);
-      if (el) {
-        el.scrollTop = 0;
-        console.log("[AH5-scroll-v2] set scrollTop=0, now:", el.scrollTop);
-      } else {
-        console.log("[AH5-scroll-v2] no .overflow-y-auto found");
-      }
-    }, 500);
+      document.documentElement.scrollTop = 0;
+    }, 100);
   }
 
   function handleBack() {
