@@ -30,7 +30,7 @@ import {
   type PendingApproval,
 } from "./pending-approvals.js";
 import type { PluginLogger } from "./pending-approvals.js";
-import { initApprovedLlmApprovals, clearApprovedLlmApproval, storeApprovedLlmApproval } from "./llm-approval-state.js";
+import { initApprovedLlmApprovals, clearApprovedLlmApproval, consumeApprovedLlmApproval, storeApprovedLlmApproval } from "./llm-approval-state.js";
 import { parseSessionKey, setCurrentSessionContext, getCurrentSessionContext } from "./session-context.js";
 import { initChannelLifecycleEvents } from "./channels/lifecycle-events.js";
 import { consumeChannelLifecycleContext } from "./channels/lifecycle-context.js";
@@ -1056,6 +1056,42 @@ export function registerAgentHiFivePlugin(api: any): void {
   const tools = buildVaultTools(client, config, stateDir);
   for (const tool of tools) {
     api.registerTool(tool);
+  }
+
+  // ── Register runtime auth override (replaces model-auth patches) ───────
+  const proxiedProviders = (pluginConfig.proxiedProviders ?? []) as string[];
+  if (proxiedProviders.length > 0 && typeof api.registerProviderRuntimeAuthOverride === "function") {
+    // Expand provider aliases (e.g. gemini → [gemini, google])
+    const PROVIDER_ALIASES: Record<string, string[]> = { gemini: ["gemini", "google"] };
+    const expandedProviders = new Set<string>();
+    for (const p of proxiedProviders) {
+      expandedProviders.add(p);
+      for (const alias of PROVIDER_ALIASES[p] ?? []) expandedProviders.add(alias);
+    }
+
+    api.registerProviderRuntimeAuthOverride({
+      providers: [...expandedProviders],
+      run: async (ctx: { provider: string; modelId: string; profileId?: string }) => {
+        // Get the current vault bearer token from the token manager
+        const token = _managedAuth?.token;
+        if (!token) return null;
+
+        const headers: Record<string, string> = {};
+        const sessionKey = _mainSessionKey?.trim() ?? "";
+        if (sessionKey) headers["x-ah5-session-key"] = sessionKey;
+        const approvalId = consumeApprovedLlmApproval(sessionKey);
+        if (approvalId) headers["x-ah5-approval-id"] = approvalId;
+
+        return {
+          apiKey: token,
+          mode: "api-key",
+          source: "agenthifive:vault-runtime-auth",
+          providerRequestHeaders: Object.keys(headers).length > 0 ? headers : undefined,
+        };
+      },
+    });
+    logger.info?.("AgentHiFive: runtime auth override registered for providers: " +
+      [...expandedProviders].join(", "));
   }
 
   // ── Register prompt injection hook ──────────────────────────────────────

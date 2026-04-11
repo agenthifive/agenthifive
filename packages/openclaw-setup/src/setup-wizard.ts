@@ -26,6 +26,7 @@ import {
   validateOpenClawDir,
   applyPatch,
   applyBroadcastPatch,
+  hasNativeRuntimeAuthOverride,
 } from "./auto-patch.js";
 
 // ---------------------------------------------------------------------------
@@ -86,7 +87,12 @@ async function prompt(question: string, defaultValue?: string): Promise<string> 
 // Shell helpers
 // ---------------------------------------------------------------------------
 
-function isOpenClawInstalled(): boolean {
+function isOpenClawInstalled(openclawDir?: string): boolean {
+  // If --openclaw-dir was provided and points to a valid install, that counts
+  if (openclawDir) {
+    const install = validateOpenClawDir(openclawDir);
+    if (install) return true;
+  }
   try {
     execSync("openclaw --version", { stdio: "pipe" });
     return true;
@@ -914,6 +920,14 @@ function patchOpenClaw(
   }
 
   if (openclawInstall) {
+    // Check if this OpenClaw version has the native runtime auth override API.
+    // When available, the plugin uses registerProviderRuntimeAuthOverride
+    // and no model-auth patches are needed.
+    if (hasNativeRuntimeAuthOverride(openclawInstall)) {
+      log("        Native runtime auth override API detected — no patches needed");
+      return;
+    }
+
     try {
       const result = applyPatch(openclawInstall);
       if (result.alreadyPatched) {
@@ -975,6 +989,14 @@ async function patchOpenClawInteractive(
   }
 
   if (openclawInstall) {
+    // Check if this OpenClaw version has the native runtime auth override API.
+    // When available, the plugin uses registerProviderRuntimeAuthOverride
+    // and no model-auth patches are needed.
+    if (hasNativeRuntimeAuthOverride(openclawInstall)) {
+      log("        Native runtime auth override API detected — no patches needed");
+      return;
+    }
+
     try {
       const result = applyPatch(openclawInstall);
       if (result.alreadyPatched) {
@@ -1290,10 +1312,11 @@ async function runFirstTimeSetup(opts: SetupOptions): Promise<void> {
   log("");
 
   // Step 1: Check OpenClaw
-  if (!isOpenClawInstalled()) {
+  if (!isOpenClawInstalled(opts.openclawDir)) {
     throw new Error(
       "OpenClaw is not installed. Install it first:\n\n" +
-        "  npm install -g openclaw@latest\n",
+        "  npm install -g openclaw@latest\n" +
+        "  Or pass --openclaw-dir /path/to/openclaw for source installs.\n",
     );
   }
   log("  [1/7] OpenClaw found on this machine");

@@ -29,6 +29,7 @@ import {
   validateOpenClawDir,
   findDistChunks,
   findGatewayChunks,
+  hasNativeRuntimeAuthOverride,
   type OpenClawInstall,
 } from "./auto-patch.js";
 import { resolveOpenClawConfigPath } from "./config-discovery.js";
@@ -500,14 +501,27 @@ export async function runVerify(openclawDir?: string): Promise<boolean> {
     return false;
   }
 
-  // 2. Chunks
-  const { total, patched, unpatched } = checkChunks(install);
+  // 2. Native API or patches
+  const nativeApi = hasNativeRuntimeAuthOverride(install);
+  if (nativeApi) {
+    ok("Native registerProviderRuntimeAuthOverride API available — no patches needed");
+  }
 
-  // 3. Runtime bridge
-  checkRuntimeBridge(install);
+  let total = 0;
+  let patched = 0;
+  let unpatched = 0;
+  if (!nativeApi) {
+    const chunks = checkChunks(install);
+    total = chunks.total;
+    patched = chunks.patched;
+    unpatched = chunks.unpatched;
 
-  // 3b. Broadcast bridge (approval watcher → TUI)
-  checkBroadcastBridge(install);
+    // 3. Runtime bridge (only relevant for patch-based installs)
+    checkRuntimeBridge(install);
+
+    // 3b. Broadcast bridge (approval watcher → TUI)
+    checkBroadcastBridge(install);
+  }
 
   // 4. Plugin
   checkPlugin();
@@ -519,12 +533,17 @@ export async function runVerify(openclawDir?: string): Promise<boolean> {
   const configPath = resolveOpenClawConfigPath();
   await checkVaultConnectivity(configPath);
 
-  // 7. Backups
-  checkBackups(install);
+  // 7. Backups (only relevant for patch-based installs)
+  if (!nativeApi) {
+    checkBackups(install);
+  }
 
   // Summary
   process.stdout.write("\n  ═══════════════════════════════════════════\n");
-  if (!_hasFailures && total > 0 && unpatched === 0) {
+  if (!_hasFailures && nativeApi) {
+    process.stdout.write(`  ${GREEN}All checks passed — using native runtime auth override API${NC}\n\n`);
+    return true;
+  } else if (!_hasFailures && total > 0 && unpatched === 0) {
     process.stdout.write(`  ${GREEN}All checks passed — ${patched}/${total} chunk(s) patched${NC}\n\n`);
     return true;
   } else if (unpatched > 0 && !_hasFailures) {

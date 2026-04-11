@@ -759,6 +759,38 @@ export function isBroadcastPatchApplied(install: OpenClawInstall): boolean {
 // ---------------------------------------------------------------------------
 
 /**
+ * Check if the OpenClaw installation supports the native
+ * registerProviderRuntimeAuthOverride plugin API.
+ *
+ * When this API is available, the AgentHiFive plugin uses it directly
+ * and no model-auth patches are needed.
+ *
+ * Detection strategy:
+ * - Source install: check if types.ts contains the API definition
+ * - Dist install: check if any dist chunk contains the registration function name
+ */
+export function hasNativeRuntimeAuthOverride(install: OpenClawInstall): boolean {
+  if (install.kind === "source") {
+    // Check the plugin types file for the API definition
+    const typesFile = path.join(install.dir, "src", "plugins", "types.ts");
+    if (!existsSync(typesFile)) return false;
+    return readFileSync(typesFile, "utf-8").includes("registerProviderRuntimeAuthOverride");
+  }
+
+  // Dist install: check compiled output for the registration function
+  const distDir = path.join(install.dir, "dist");
+  if (!existsSync(distDir)) return false;
+  const files = readdirSync(distDir).filter((f) => f.endsWith(".mjs") || f.endsWith(".js"));
+  for (const file of files) {
+    const content = readFileSync(path.join(distDir, file), "utf-8");
+    if (content.includes("providerRuntimeAuthOverrides")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Check if the credential resolution patch is applied in an OpenClaw installation.
  */
 export function isPatchApplied(install: OpenClawInstall): boolean {

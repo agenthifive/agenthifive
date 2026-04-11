@@ -1,14 +1,14 @@
 # OpenClaw Upstream PR Design: Runtime Provider Auth Override
 
-> **Purpose**: Rewrite of the OpenClaw upstream PR proposal after the channel-plugin migration. The remaining upstream ask is no longer "general credential providers everywhere." The narrow gap is a public way for an external plugin to exchange or override runtime auth for built-in model providers, so AgentHiFive can keep short-lived rotating vault tokens without patching OpenClaw core.
+> **Purpose**: Rewrite of the OpenClaw upstream PR proposal after the channel-plugin migration. The remaining upstream ask is no longer a general credential framework. The concrete gap is a public way for an external plugin to override runtime auth for built-in model providers, so AgentHiFive can stop patching OpenClaw core.
 >
-> **Date**: 2026-03-24
+> **Date**: 2026-04-11
 >
 > **Prerequisites**:
 > - [CREDENTIAL_ARCHITECTURE_ANALYSIS.md](./CREDENTIAL_ARCHITECTURE_ANALYSIS.md)
 > - [OPENCLAW_TECHNICAL_INTEGRATION.md](./OPENCLAW_TECHNICAL_INTEGRATION.md)
 >
-> **Status**: Draft
+> **Status**: Revised draft
 
 ---
 
@@ -17,43 +17,49 @@
 The original upstream pitch was too broad.
 
 We no longer need OpenClaw changes for channel support:
-- Telegram and Slack now work as native channel plugins
-- `before_agent_start` usage is public plugin API, not a patch
-- channel approvals and lifecycle follow-up can be handled in plugin space
+- Telegram and Slack work as native channel plugins
+- `before_agent_start` is already public plugin API
+- approvals and follow-up lifecycle behavior can stay in plugin space
 
 The one remaining place where AgentHiFive still patches OpenClaw is **LLM runtime auth**.
 
-Today we patch OpenClaw so that when a configured provider such as `anthropic`, `openai`, or `openrouter` is vault-managed, OpenClaw uses the **current short-lived vault bearer token** instead of a static API key from config. That patch works, but it is not the right long-term interface.
+Today AgentHiFive patches OpenClaw so that when a built-in provider such as `anthropic`, `openai`, or `openrouter` is vault-managed, OpenClaw uses the current vault-issued runtime credential instead of the static configured key. It also patches request-header injection so the outbound provider request carries AgentHiFive routing headers such as session and approval identifiers.
+
+That works, but it is still a core patch.
+
+It also relies on an implicit mutable bridge through `globalThis.__ah5_runtime` so plugin-owned state can be read from patched core code. A public override API removes not only the patch, but also that undocumented side channel between plugin code and OpenClaw internals.
 
 ### New upstream ask
 
-Add a **public runtime-auth override hook for built-in model providers**.
+Add a small public registration API for **runtime auth override of built-in providers**.
 
-That hook should let a plugin say:
+The API should let an external plugin say:
+- for this built-in provider
+- and this selected model
+- use this runtime auth instead of the default resolved auth
+- optionally override the provider base URL
+- optionally attach extra provider request headers
 
-- for provider `anthropic`
-- using the already-selected model and configured provider
-- here is the runtime credential to use for this request
-- optionally with expiry and base URL override
-
-This keeps the best parts of the current architecture:
+This keeps the right division of responsibility:
 - OpenClaw still owns built-in provider behavior
-- OpenClaw still owns provider quirks and catalog evolution
-- AgentHiFive only owns the auth exchange
+- OpenClaw still owns provider quirks, transport, and catalog evolution
+- AgentHiFive only owns the runtime auth exchange and broker-specific headers
 
-### Why this is a better pitch
+### Why this shape
 
-It is much smaller than the old `CredentialProvider` abstraction:
-- fewer moving parts
-- no channel credential resolution work
+This is intentionally narrower than the old `CredentialProvider` proposal:
+- no channel credential abstraction
 - no broadcast ask
-- no new general-purpose secret-management framework
+- no generic secret-manager framework
+- no gateway lifecycle redesign
 
-It also aligns with APIs OpenClaw already has for provider plugins:
-- `prepareRuntimeAuth`
-- `resolveUsageAuth`
+It also avoids the two extremes:
+- too small to replace only patch 1 and leave patch 2 behind
+- too broad to look like a generic request-mutation framework
 
-The gap is that those hooks are available when you **are the provider plugin**, but not when you want to **augment a built-in provider from another plugin**.
+The right middle ground is:
+- a narrow auth-override registration API
+- plus `providerRequestHeaders` in the result so the same PR can replace both existing local model-auth patches
 
 ---
 
@@ -61,32 +67,27 @@ The gap is that those hooks are available when you **are the provider plugin**, 
 
 ### Channels do not need an upstream PR
 
-This was the biggest architectural uncertainty and it is now resolved.
-
 AgentHiFive can integrate Telegram and Slack through OpenClaw's channel-plugin SDK:
 - native channel plugin entry
-- native inbound/outbound runtime
+- native inbound and outbound runtime
 - approval-aware outbound actions
-- no fake-channel prompt-injection ingress
+- no fake-channel prompt ingress
 
-So we should not ask OpenClaw for new channel APIs as part of this PR.
+So we should not ask OpenClaw for channel APIs in this PR.
 
 ### `before_agent_start` is not a patch
 
-AgentHiFive still uses `before_agent_start` in its generic plugin layer, but that hook is already public plugin API.
+AgentHiFive still uses `before_agent_start`, but that hook is already public API.
 
-This is not an upstream blocker. At most, it is future polish if OpenClaw wants cleaner modern hook surfaces.
+That is not an upstream blocker.
 
 ### OpenClaw already supports provider-owned runtime auth
 
-The local SDK/runtime already exposes:
-
+OpenClaw already has provider-side concepts such as:
 - `prepareRuntimeAuth`
 - `resolveUsageAuth`
 
-These are real provider-runtime extension points. For example, GitHub Copilot exchanges a source credential into a short-lived runtime token through `prepareRuntimeAuth`.
-
-So the missing capability is not "support rotating runtime auth at all."
+So the missing capability is not "support runtime auth exchange at all."
 
 The missing capability is:
 
@@ -96,47 +97,33 @@ The missing capability is:
 
 ## 3. Current Problem
 
-### Current architecture
-
-AgentHiFive currently wants to keep using OpenClaw's built-in providers:
+AgentHiFive wants to keep using OpenClaw's built-in providers:
 - `anthropic`
 - `openai`
 - `openrouter`
 
-This is desirable because OpenClaw already owns:
+That is desirable because OpenClaw already owns:
 - provider-specific capability hints
 - model-family quirks
-- xhigh / reasoning / modern-model behavior
-- transport tweaks
+- reasoning and transport behavior
 - usage behavior
 - catalog evolution
 
-At runtime, however, AgentHiFive does not want OpenClaw to use a static provider API key from config. It wants OpenClaw to use the **current short-lived vault bearer token**.
+At runtime, however, AgentHiFive does not want OpenClaw to use a static provider API key from config. It wants OpenClaw to use the current brokered runtime credential.
 
-Today we accomplish that by patching OpenClaw core model auth resolution.
+Today we accomplish that with two local patches in `model-auth.ts`:
 
-### What the patch does
+### Patch 1: runtime auth replacement
 
-The patch checks:
-- whether the provider is in AgentHiFive's proxied provider list
-- whether AgentHiFive runtime state currently has a vault bearer token
+If the provider is proxied and AgentHiFive has a current vault bearer token, OpenClaw uses that token as the resolved runtime auth.
 
-If yes, OpenClaw uses that bearer token as the provider API key for the request.
+### Patch 2: provider request headers
 
-This is effective, but it is still a patch.
+If the runtime auth came from AgentHiFive's vault path, OpenClaw injects broker-specific request headers such as:
+- `x-ah5-session-key`
+- `x-ah5-approval-id`
 
-### Why the old broad PR is no longer ideal
-
-The previous `CredentialProvider` proposal asked OpenClaw to:
-- add a generic credential-provider abstraction
-- integrate it into model auth
-- integrate it into channel startup
-- expose broadcast to plugins
-- enrich gateway lifecycle contexts
-
-That proposal tried to solve too many problems at once.
-
-Now that channels are solved in plugin space, the actual upstream gap is much narrower.
+Patch 1 and patch 2 are both part of the real integration. Replacing only patch 1 would still leave AgentHiFive carrying a local patch.
 
 ---
 
@@ -144,52 +131,30 @@ Now that channels are solved in plugin space, the actual upstream gap is much na
 
 ### Proposal
 
-Add a public hook that lets external plugins override or exchange runtime auth for a built-in provider just before inference.
+Add a public registration API:
 
-Working name:
 - `registerProviderRuntimeAuthOverride`
 
-The intent is:
-- model/provider selection still happens normally
-- built-in provider behavior still belongs to OpenClaw
-- an external plugin may transform the resolved credential into the actual runtime credential
+This should allow regular plugins to override runtime auth for specific built-in providers without replacing the provider implementation.
 
-### Mental model
-
-This is the built-in-provider analogue of `prepareRuntimeAuth`.
-
-Today:
-- provider plugins can do runtime auth exchange for the providers they own
-
-Proposed:
-- regular plugins can do runtime auth exchange for built-in providers they do **not** own
-
-### Sketch of the API
+### Minimal API shape
 
 ```ts
 export type ProviderRuntimeAuthOverrideContext = {
-  config?: OpenClawConfig;
-  agentDir?: string;
-  workspaceDir?: string;
-  env: NodeJS.ProcessEnv;
   provider: string;
   modelId: string;
-  model: ProviderRuntimeModel;
-  apiKey: string;
-  authMode: string;
   profileId?: string;
 };
 
 export type ProviderRuntimeAuthOverrideResult = {
   apiKey: string;
-  baseUrl?: string;
-  expiresAt?: number;
+  mode?: string;
   source?: string;
+  baseUrl?: string;
+  providerRequestHeaders?: Record<string, string>;
 };
 
 export type ProviderRuntimeAuthOverride = {
-  pluginId?: string;
-  priority?: number;
   providers: string[];
   run: (
     ctx: ProviderRuntimeAuthOverrideContext
@@ -202,54 +167,165 @@ SDK registration:
 ```ts
 api.registerProviderRuntimeAuthOverride({
   providers: ["anthropic", "openai", "openrouter"],
-  priority: 0,
   run: async (ctx) => {
     const token = await getCurrentVaultBearerTokenForProvider(ctx.provider);
     if (!token) return null;
+
     return {
       apiKey: token.value,
-      expiresAt: token.expiresAt,
+      mode: "api-key",
       source: "agenthifive:vault-runtime-auth",
+      baseUrl: token.baseUrl,
+      providerRequestHeaders: {
+        "x-ah5-session-key": getCurrentSessionKey(),
+        "x-ah5-approval-id": getApprovedLlmApprovalId(),
+      },
     };
   },
 });
 ```
 
-### Runtime integration point
+### Why this exact surface
 
-The integration point should be in the same phase where OpenClaw currently:
-- resolves raw configured auth for a provider
-- optionally applies provider-owned runtime auth preparation
-- stores runtime auth for the inference request
+#### Keep
 
-The desired order is:
+- `provider`
+- `modelId`
+- `profileId?`
 
-1. OpenClaw resolves the normal configured credential
-2. OpenClaw asks registered runtime-auth override plugins whether they want to replace/exchange it
-3. If no override applies, existing behavior continues
-4. If an override applies, that runtime credential is used
-5. Built-in provider behavior otherwise remains unchanged
+That is enough context for AgentHiFive's use case and is easy for OpenClaw to document and keep stable.
+
+#### Keep
+
+- `baseUrl`
+
+This is a small addition, but it keeps the API useful for brokered or proxied provider endpoints.
+
+The returned `baseUrl` should apply only to the single inference call being built. It should not mutate provider configuration or reconfigure the provider instance globally.
+
+#### Keep
+
+- `providerRequestHeaders`
+
+This is the one non-negotiable addition beyond basic auth override if this PR is expected to replace both existing local patches. Without it, AgentHiFive still needs a second local patch or a second upstream ask.
+
+#### Cut
+
+- `config`
+- `agentDir`
+- `workspaceDir`
+- `env`
+- `model: ProviderRuntimeModel`
+- `priority`
+- `expiresAt`
+- `resolvedAuth.apiKey`
+
+These are all extra surface for v1 and create avoidable review risk.
+
+In particular:
+- `resolvedAuth.apiKey` raises an obvious "why is one plugin receiving another provider's secret?" question
+- `priority` is unnecessary if registration order plus first non-null win is the rule
+- `expiresAt` should not be exposed unless OpenClaw is actually going to consume it
+
+### Notes on `mode` and `source`
+
+These should be explicitly described as optional metadata on the returned runtime auth, not as a second configuration surface.
+
+Recommendation:
+- `mode` is an opaque string carried with resolved auth for existing OpenClaw auth bookkeeping and logging
+- `source` is an opaque string for attribution, logging, and debugging
+
+This proposal does not require OpenClaw to interpret arbitrary new `mode` values. For AgentHiFive's use case, the returned value remains `mode: "api-key"`.
 
 ---
 
-## 5. Why This Is Better Than Turning AgentHiFive Into the Provider
+## 5. Runtime Semantics
 
-AgentHiFive could also avoid the patch by becoming a full provider plugin for:
+The intended flow is:
+
+1. OpenClaw resolves provider and model normally.
+2. OpenClaw resolves the normal auth for that provider.
+3. OpenClaw runs registered runtime auth overrides for that provider.
+4. The first override that returns a non-null result wins.
+5. OpenClaw uses that returned auth, base URL, and request headers when building the outbound provider request.
+6. If no override applies, existing behavior continues unchanged.
+
+### Explicit contract
+
+- The callback runs only for exact built-in provider ids listed in `providers`.
+- Unknown provider ids in the registration list are ignored silently.
+- `null` or `undefined` means "no override, continue default behavior."
+- Throwing or rejecting means "override failed, fail the request after logging."
+- There should be no implicit fallback after a thrown error.
+- If a plugin wants fallback behavior, it should catch internally and return `null`.
+- The callback is asynchronous and may perform network I/O such as token exchange or refresh.
+- OpenClaw may enforce a reasonable timeout for override execution so a hung plugin does not stall an inference request indefinitely.
+
+### Error shape
+
+Recommendation:
+- OpenClaw should surface a structured runtime-auth-override failure that includes the provider id and the plugin or override registration identity when available
+- the agent-facing error can still be rendered as a normal inference failure, but the underlying message should make it clear the failure happened in runtime auth override rather than in provider transport
+
+This matters because the proposal intentionally changes behavior from silent fallback on internal override failure to explicit request failure.
+
+### Multiple registrations
+
+Recommendation:
+- allow multiple registrations
+- use registration order
+- first non-null result wins
+
+This is simpler than exposing a public `priority` mechanism in v1.
+
+### Provider wildcard
+
+Recommendation:
+- wildcard provider matching is out of scope for v1
+- plugins should register the exact built-in providers they want to override
+- when OpenClaw adds a new built-in provider, a plugin can opt in explicitly by updating its registration list
+
+This keeps the first version easier to reason about and avoids hidden behavior changes when new providers are introduced upstream.
+
+---
+
+## 6. Why Not A Generic Hook
+
+A generic request-mutation hook could also solve this problem.
+
+That is true, and the proposal should say so plainly.
+
+The reason to prefer a dedicated registration API here is not that a generic hook is impossible. The reason is that a dedicated API:
+- communicates narrower scope
+- is easier to document
+- is easier to constrain
+- is easier to review as an additive change
+
+That matters because the review risk is not auth replacement by itself. The review risk is letting the PR feel like a broad request-mutation surface.
+
+This proposal avoids that by keeping the scope tightly named and tightly typed:
+- runtime auth override for built-in providers
+- plus narrowly scoped provider request headers needed to complete the auth path
+
+---
+
+## 7. Why This Is Better Than Turning AgentHiFive Into The Provider
+
+AgentHiFive could avoid the patch by becoming a full provider plugin for:
 - Anthropic
 - OpenAI
 - OpenRouter
 
-That is viable, because OpenClaw already exposes provider-plugin hooks such as `prepareRuntimeAuth`.
-
-But that path has a higher maintenance cost because AgentHiFive would then own more of the provider surface:
+That is technically viable, but it moves too much ownership into AgentHiFive:
 - catalog curation
-- capability metadata
 - compatibility quirks
-- long-term alignment with OpenClaw's built-in provider behavior
+- provider metadata behavior
+- long-term alignment with OpenClaw's built-in providers
 
-By contrast, the narrow runtime-auth override hook preserves the best division of responsibility:
+The narrow runtime-auth override API preserves the cleaner split:
 
-### OpenClaw continues to own
+### OpenClaw owns
+
 - built-in provider ids
 - provider quirks and compatibility logic
 - model metadata behavior
@@ -257,107 +333,76 @@ By contrast, the narrow runtime-auth override hook preserves the best division o
 - usage behavior
 - ongoing provider evolution
 
-### AgentHiFive owns only
-- vault token exchange
+### AgentHiFive owns
+
+- runtime token exchange
 - short-lived credential rotation
+- broker-specific routing and approval headers
 - policy and governance around model access
 
-This is the cleanest long-term split if OpenClaw is willing to expose the hook.
+---
+
+## 8. Backwards Compatibility
+
+This proposal is additive and should be fully backwards compatible.
+
+If no plugin registers an override:
+- existing provider auth behavior remains unchanged
+
+If an override is registered but returns `null`:
+- existing provider auth behavior remains unchanged
+
+Only a plugin that explicitly opts in changes behavior for a provider.
+
+Once shipped, this API surface should be considered stable and follow OpenClaw's normal deprecation policy.
+
+### Testing expectations
+
+The PR should include Vitest tests alongside the existing runtime auth test suite (e.g., `src/secrets/runtime.test.ts`). Recommended coverage:
+
+- override applied: registered override returns auth, provider uses it
+- override returns null: default auth behavior unchanged
+- override throws: request fails with structured error (not silent fallback)
+- multiple registrations: first non-null result wins, registration order respected
+- unknown provider id in registration: ignored silently, no error
+- `baseUrl` override: applied to single inference call only
+- `providerRequestHeaders`: merged into outbound provider request
 
 ---
 
-## 6. Backwards Compatibility
-
-This proposal should be fully backwards compatible.
-
-If no plugin registers a runtime-auth override:
-- existing provider auth behavior remains unchanged
-
-If overrides are registered but return `null`:
-- existing provider auth behavior remains unchanged
-
-This is important for upstream review because the change is additive and low-risk.
-
----
-
-## 7. What This Replaces
+## 9. What This Replaces
 
 ### Replaces
-- AgentHiFive `model-auth` patch for vault-managed LLM proxying
+
+- AgentHiFive patch 1: runtime auth replacement for proxied built-in providers
+- AgentHiFive patch 2: provider request-header injection for vault-managed model calls
 
 ### Does not replace
-- normal plugin hooks
+
 - channel plugin entrypoints
-- built-in provider plugins
 - provider-owned `prepareRuntimeAuth`
+- provider-owned `resolveUsageAuth`
+- broadcast bridge work
+- general plugin hooks such as `before_agent_start`
 
 This proposal is intentionally narrow.
 
 ---
 
-## 8. Why We Are Not Asking For More
+## 10. What We Are Not Asking For
 
-We should explicitly avoid asking OpenClaw for things we no longer need.
+This PR should explicitly avoid asking OpenClaw for things we no longer need.
 
 ### Not requested in this PR
 
 - no channel credential-provider abstraction
 - no plugin broadcast API changes
-- no gateway lifecycle hook redesign
-- no new generalized external secret-manager framework
+- no gateway lifecycle redesign
+- no generalized external secret-manager framework
+- no usage-auth analogue in the same PR
 - no changes to `before_agent_start`
 
-Those either:
-- already work today
-- are no longer needed
-- or are product polish rather than launch blockers
-
-That makes the upstream ask easier to review and more likely to land.
-
----
-
-## 9. MVP Story If The PR Does Not Land Quickly
-
-AgentHiFive still has a credible MVP without this PR.
-
-### MVP path A
-- ship current architecture
-- keep the model-auth patch for short-lived rotating tokens
-
-### MVP path B
-- avoid the patch by using a longer-lived vault token for LLM proxy auth
-- accept that this is less elegant than the rotating-token design
-
-So this PR is not required to prove the product.
-It is the path to the cleanest long-term architecture.
-
----
-
-## 10. Optional Follow-Up PRs
-
-If OpenClaw is receptive, there are a couple of possible follow-ups. These should be framed as optional, not bundled into the first ask.
-
-### Follow-up A: usage-auth override for built-in providers
-
-OpenClaw already has provider-owned `resolveUsageAuth`.
-
-If AgentHiFive also wants to mediate usage endpoints for built-in providers without becoming the provider, a similar external override could be useful:
-- same spirit as runtime-auth override
-- for `/usage` and related surfaces
-
-This is useful, but not necessary for the first PR.
-
-### Follow-up B: cleaner modern prompt/context hooks
-
-AgentHiFive still uses public hooks such as `before_agent_start`. That works today.
-
-If OpenClaw wants to encourage newer patterns, future hook surfaces such as:
-- `before_model_resolve`
-- `before_prompt_build`
-
-could be emphasized more clearly in docs or API recommendations.
-
-Again, not required for the auth PR.
+That keeps the ask easier to review and more likely to land.
 
 ---
 
@@ -367,29 +412,33 @@ Again, not required for the auth PR.
 
 OpenClaw already supports provider-owned runtime auth exchange for provider plugins, but there is no public way for an external plugin to apply the same pattern to an existing built-in provider.
 
-This makes it hard to integrate enterprise vaults and policy brokers that want to:
+That makes it hard to integrate enterprise vaults and policy brokers that want to:
 - keep built-in provider behavior
-- but replace static provider secrets with short-lived runtime credentials
+- replace static provider secrets with short-lived runtime credentials
+- attach narrow broker-specific request headers at the final provider call boundary
 
 ### Proposed solution
 
-Add an additive plugin API that lets external plugins override or exchange runtime auth for specific built-in providers just before inference.
+Add an additive plugin API that lets external plugins override runtime auth for specific built-in providers just before inference.
+
+The returned override may supply:
+- `apiKey`
+- optional `mode`
+- optional `source`
+- optional `baseUrl`
+- optional `providerRequestHeaders`
 
 ### Benefits
 
 - no breaking changes
 - keeps built-in provider behavior intact
-- enables vault/secret-broker integrations without forks
-- uses an architectural pattern OpenClaw already understands through `prepareRuntimeAuth`
+- removes the need for local model-auth patches
+- enables vault and broker integrations without asking plugins to reimplement provider families
+- removes the need for an undocumented `globalThis` bridge between plugin code and patched core code
 
-### Why this is better than a broader secret-manager framework
+### Why not a broader secret-manager framework
 
-It solves a concrete real problem with a small review surface.
-
-It is easier to reason about than a general `CredentialProvider` system because it touches only:
-- model runtime auth
-- only at inference time
-- only when a plugin explicitly opts in
+Because the narrower API solves the concrete problem with a much smaller review surface.
 
 ---
 
@@ -397,38 +446,28 @@ It is easier to reason about than a general `CredentialProvider` system because 
 
 If this hook is accepted:
 
-1. Keep current channel-plugin architecture unchanged
-2. Remove the `model-auth` patch
-3. Register a runtime-auth override for:
+1. Keep current channel-plugin architecture unchanged.
+2. Remove the local model-auth patches.
+3. Register a runtime auth override for:
    - `anthropic`
    - `openai`
    - `openrouter`
-4. Continue using `channels.agenthifive` as the canonical integration config
-5. Keep OpenClaw built-in providers and their model behavior
+4. Continue using OpenClaw built-in providers for provider behavior.
 
-That gives AgentHiFive a strong long-term story:
-- no core patch
+That gives AgentHiFive the desired long-term state:
+- no core patch for model auth
 - no fake channel plumbing
 - no provider-family reimplementation
 
 ---
 
-## 13. Open Questions
+## 13. If The PR Does Not Land
 
-1. Should the override run before or after provider-owned `prepareRuntimeAuth`?
-   - Recommendation: before provider-owned exchange for built-ins, or as a dedicated step that feeds the credential into the existing pipeline.
+AgentHiFive still has a fallback path if this upstream change is rejected or delayed:
+- the existing local patches continue to work
+- the current integration can keep shipping on top of those patches
 
-2. Should multiple plugins be allowed to register overrides for the same provider?
-   - Recommendation: yes, with priority ordering and first non-null win.
-
-3. Should the result be allowed to override `baseUrl`?
-   - Recommendation: yes. This is important for brokered proxy endpoints and parity with existing `prepareRuntimeAuth`.
-
-4. Should the result carry expiry?
-   - Recommendation: yes. This enables generic refresh semantics in long-running turns.
-
-5. Should there also be a usage-auth analogue in the same PR?
-   - Recommendation: no. Keep the first PR narrow.
+That means this proposal is a cleanup and stability improvement, not a launch blocker.
 
 ---
 
@@ -436,12 +475,8 @@ That gives AgentHiFive a strong long-term story:
 
 The original upstream plan was broader than necessary.
 
-Now that channels are solved in plugin space, the clean upstream ask is:
+Now that channels are solved in plugin space, the clean one-PR ask is:
 
-**Add a public runtime-auth override hook for built-in model providers.**
+**Add a public runtime auth override registration API for built-in model providers, with optional `baseUrl` and `providerRequestHeaders`.**
 
-That is the one change that would let AgentHiFive:
-- keep short-lived rotating vault tokens
-- avoid patching OpenClaw core
-- keep using OpenClaw's built-in provider ecosystem
-- avoid reimplementing provider families just to own auth exchange
+That is the smallest proposal that still replaces both existing AgentHiFive model-auth patches in one shot.
