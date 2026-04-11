@@ -3702,6 +3702,7 @@ export async function executeModelBRequest(
 
   // Get the access token — for Telegram, use bot token; for API key providers, use API key; for OAuth, refresh first
   let accessToken: string;
+  let tokenJustRefreshed = false;
 
   if (connection.provider === "telegram" || connection.provider === "slack") {
     if (!tokenData.botToken) {
@@ -3720,6 +3721,7 @@ export async function executeModelBRequest(
         (log ?? fastify.log).info({ connectionId, provider: "anthropic" }, "Refreshing Anthropic OAuth token");
         const newTokens = await refreshAnthropicToken(tokenData.refreshToken);
         currentToken = newTokens.accessToken;
+        tokenJustRefreshed = true;
         log?.debug({ provider: "anthropic", refreshed: true }, "vault.exec.tokenRefresh.result");
 
         // Persist refreshed tokens (fire-and-forget)
@@ -3789,6 +3791,7 @@ export async function executeModelBRequest(
     }
 
     accessToken = newTokenSet.accessToken;
+    tokenJustRefreshed = true;
 
     // Re-encrypt and update stored tokens (fire-and-forget)
     const updatedTokenPayload = JSON.stringify({
@@ -4307,8 +4310,9 @@ export async function executeModelBRequest(
       ? providerResponse.headers["content-type"][0]
       : providerResponse.headers["content-type"];
 
-    // Mark connection for reauth on 401 (same as the non-transparent path)
-    if (providerResponse.statusCode === 401) {
+    // Mark connection for reauth on 401, but only if token was NOT just refreshed
+    // (a freshly refreshed token that gets 401 indicates a scope/permission issue, not a bad credential)
+    if (providerResponse.statusCode === 401 && !tokenJustRefreshed) {
       markConnectionNeedsReauth(
         connectionId,
         `Provider returned 401`,
@@ -4449,12 +4453,13 @@ export async function executeModelBRequest(
     responseBody = truncated;
   }
 
-  // Only 401 triggers reauth — we refresh tokens before every request,
-  // so 403 after a successful refresh always means a permission/quota issue,
-  // never a credential problem. This applies to all credential types.
-  const shouldMarkReauth = providerResponse.statusCode === 401;
+  // 401 handling: if the token was just refreshed successfully, the credential is
+  // valid — the 401 means a scope/permission issue (e.g., conditional access policy,
+  // missing admin consent), not an invalid token. Only mark needs_reauth when the
+  // token was NOT just refreshed (stale token, API key revoked, etc.).
+  const shouldMarkReauth = providerResponse.statusCode === 401 && !tokenJustRefreshed;
 
-  if (shouldMarkReauth) {
+  if (providerResponse.statusCode === 401) {
     const wwwAuth = providerResponse.headers["www-authenticate"];
     (log ?? fastify.log).warn(
       {
@@ -4463,14 +4468,18 @@ export async function executeModelBRequest(
         statusCode: providerResponse.statusCode,
         responseBody: responseBody?.substring(0, 500),
         wwwAuthenticate: Array.isArray(wwwAuth) ? wwwAuth[0] : wwwAuth,
+        tokenJustRefreshed,
+        markedNeedsReauth: shouldMarkReauth,
       },
       "vault.exec.provider.authFailure",
     );
-    markConnectionNeedsReauth(
-      connectionId,
-      `Provider returned ${providerResponse.statusCode}`,
-      log ?? fastify.log,
-    ).catch((err) => { (log ?? fastify.log).error({ err, connectionId }, "Failed to mark connection for reauth"); });
+    if (shouldMarkReauth) {
+      markConnectionNeedsReauth(
+        connectionId,
+        `Provider returned ${providerResponse.statusCode}`,
+        log ?? fastify.log,
+      ).catch((err) => { (log ?? fastify.log).error({ err, connectionId }, "Failed to mark connection for reauth"); });
+    }
   }
 
   // Log structured error metadata for non-401 4xx responses (no body — may contain PII)
