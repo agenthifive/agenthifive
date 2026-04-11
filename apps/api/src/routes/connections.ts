@@ -1268,6 +1268,11 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
       });
       const redirectUri = pendingMeta?.redirectUri ?? `${WEB_URL}/api/connections/callback`;
 
+      request.log.info(
+        { redirectUri, provider: pending.provider, hasCodeVerifier: !!pending.codeVerifier },
+        "conn.oauth.exchange.start",
+      );
+
       let tokenSet;
       try {
         tokenSet = await connector.exchangeAuthorizationCode({
@@ -1278,11 +1283,30 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
           redirectUri,
         });
       } catch (err) {
+        // oauth4webapi wraps Google's error in ResponseBodyError.cause
+        const oauthCause = err instanceof Error && err.cause && typeof err.cause === "object"
+          ? err.cause as Record<string, unknown>
+          : undefined;
+        request.log.error(
+          {
+            err,
+            oauthError: oauthCause?.error,
+            oauthErrorDescription: oauthCause?.error_description,
+            provider: pending.provider,
+            redirectUri,
+            workspaceId: pending.workspaceId,
+          },
+          "conn.oauth.exchange.failed",
+        );
         await db
           .delete(pendingConnections)
           .where(eq(pendingConnections.id, pending.id));
-        const message =
-          err instanceof Error ? err.message : "Token exchange failed";
+        // Surface the actual OAuth error (e.g. "invalid_grant") instead of the generic wrapper
+        const message = oauthCause?.error_description
+          ? String(oauthCause.error_description)
+          : oauthCause?.error
+            ? String(oauthCause.error)
+            : err instanceof Error ? err.message : "Token exchange failed";
         return reply.redirect(
           `${WEB_URL}/dashboard/connections?error=${encodeURIComponent(message)}`,
         );
