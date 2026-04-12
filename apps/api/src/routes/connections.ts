@@ -11,6 +11,7 @@ import { agents } from "../db/schema/agents";
 import { agentPermissionRequests } from "../db/schema";
 import { encrypt, decrypt, type EncryptedPayload } from "@agenthifive/security";
 import { resolveConnector } from "../utils/oauth-connector-factory";
+import { getHealthProbeUrl } from "../utils/connection-health-probe";
 import { validateEmailConnection } from "./email-provider";
 import { logConnectionNeedsReauth, logConnectionRevoked } from "../services/audit";
 import { fetchMicrosoftProfile } from "../utils/microsoft-profile";
@@ -2240,86 +2241,28 @@ export default async function connectionRoutes(fastify: FastifyInstance) {
             return reply.code(400).send({ ok: false, error: `${entry.displayName} token refresh failed: ${message}`, hint: "Click 'Reconnect' to re-authorize." });
           }
 
-          // Use service-specific test endpoints that match the granted scopes.
-          // Google userinfo requires openid/email scopes which service connections don't have.
-          const serviceTestEndpoints: Record<string, { url: string; parseDetail: (json: unknown) => string }> = {
-            "google-gmail": {
-              url: "https://gmail.googleapis.com/gmail/v1/users/me/profile",
-              parseDetail: (json) => {
-                const d = json as { emailAddress?: string };
-                return `Connected as ${d.emailAddress ?? "Gmail user"}`;
-              },
-            },
-            "google-calendar": {
-              url: "https://www.googleapis.com/calendar/v3/calendars/primary",
-              parseDetail: (json) => {
-                const d = json as { summary?: string };
-                return `Connected to ${d.summary ?? "primary calendar"}`;
-              },
-            },
-            "google-drive": {
-              url: "https://www.googleapis.com/drive/v3/about?fields=user",
-              parseDetail: (json) => {
-                const d = json as { user?: { emailAddress?: string } };
-                return `Connected as ${d.user?.emailAddress ?? "Drive user"}`;
-              },
-            },
-            "google-sheets": {
-              url: "https://www.googleapis.com/drive/v3/about?fields=user",
-              parseDetail: (json) => {
-                const d = json as { user?: { emailAddress?: string } };
-                return `Connected as ${d.user?.emailAddress ?? "Sheets user"}`;
-              },
-            },
-            "google-docs": {
-              url: "https://www.googleapis.com/drive/v3/about?fields=user",
-              parseDetail: (json) => {
-                const d = json as { user?: { emailAddress?: string } };
-                return `Connected as ${d.user?.emailAddress ?? "Docs user"}`;
-              },
-            },
-            "microsoft-teams": {
-              url: "https://graph.microsoft.com/v1.0/me",
-              parseDetail: (json) => {
-                const d = json as { displayName?: string; mail?: string };
-                return `Connected as ${d.displayName ?? d.mail ?? "Teams user"}`;
-              },
-            },
-            "microsoft-outlook-mail": {
-              url: "https://graph.microsoft.com/v1.0/me",
-              parseDetail: (json) => {
-                const d = json as { displayName?: string; mail?: string };
-                return `Connected as ${d.displayName ?? d.mail ?? "Outlook user"}`;
-              },
-            },
-            "microsoft-outlook-calendar": {
-              url: "https://graph.microsoft.com/v1.0/me",
-              parseDetail: (json) => {
-                const d = json as { displayName?: string; mail?: string };
-                return `Connected as ${d.displayName ?? d.mail ?? "Outlook user"}`;
-              },
-            },
-            "microsoft-onedrive": {
-              url: "https://graph.microsoft.com/v1.0/me",
-              parseDetail: (json) => {
-                const d = json as { displayName?: string; mail?: string };
-                return `Connected as ${d.displayName ?? d.mail ?? "OneDrive user"}`;
-              },
-            },
-            "microsoft-outlook-contacts": {
-              url: "https://graph.microsoft.com/v1.0/me",
-              parseDetail: (json) => {
-                const d = json as { displayName?: string; mail?: string };
-                return `Connected as ${d.displayName ?? d.mail ?? "Contacts user"}`;
-              },
-            },
+          // Use the shared probe URLs (same ones the vault uses to verify credentials on 401)
+          // paired with service-specific parsers for the "Connected as ..." detail.
+          const parseDetailByService: Record<string, (json: unknown) => string> = {
+            "google-gmail": (json) => `Connected as ${(json as { emailAddress?: string }).emailAddress ?? "Gmail user"}`,
+            "google-calendar": (json) => `Connected to ${(json as { summary?: string }).summary ?? "primary calendar"}`,
+            "google-drive": (json) => `Connected as ${(json as { user?: { emailAddress?: string } }).user?.emailAddress ?? "Drive user"}`,
+            "google-sheets": (json) => `Connected as ${(json as { user?: { emailAddress?: string } }).user?.emailAddress ?? "Sheets user"}`,
+            "google-docs": (json) => `Connected as ${(json as { user?: { emailAddress?: string } }).user?.emailAddress ?? "Docs user"}`,
+            "microsoft-teams": (json) => `Connected as ${(json as { displayName?: string; mail?: string }).displayName ?? (json as { mail?: string }).mail ?? "Teams user"}`,
+            "microsoft-outlook-mail": (json) => `Connected as ${(json as { displayName?: string; mail?: string }).displayName ?? (json as { mail?: string }).mail ?? "Outlook user"}`,
+            "microsoft-outlook-calendar": (json) => `Connected as ${(json as { displayName?: string; mail?: string }).displayName ?? (json as { mail?: string }).mail ?? "Outlook user"}`,
+            "microsoft-onedrive": (json) => `Connected as ${(json as { displayName?: string; mail?: string }).displayName ?? (json as { mail?: string }).mail ?? "OneDrive user"}`,
+            "microsoft-outlook-contacts": (json) => `Connected as ${(json as { displayName?: string; mail?: string }).displayName ?? (json as { mail?: string }).mail ?? "Contacts user"}`,
           };
 
           const service = connection.service as string;
-          const testEndpoint = serviceTestEndpoints[service];
-          if (!testEndpoint) {
+          const probeUrl = getHealthProbeUrl(service);
+          const parseDetail = parseDetailByService[service];
+          if (!probeUrl || !parseDetail) {
             return reply.code(400).send({ ok: false, error: `No test implemented for service: ${service}` });
           }
+          const testEndpoint = { url: probeUrl, parseDetail };
 
           const res = await fetch(testEndpoint.url, {
             headers: { "Authorization": `Bearer ${accessToken}` },

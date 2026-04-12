@@ -4311,13 +4311,19 @@ export async function executeModelBRequest(
       : providerResponse.headers["content-type"];
 
     // Mark connection for reauth on 401, but only if token was NOT just refreshed
-    // (a freshly refreshed token that gets 401 indicates a scope/permission issue, not a bad credential)
+    // and probe confirms the credential is actually bad. The transparent proxy is
+    // used mostly for LLM providers (API keys) where probeConnectionAuth returns
+    // "unknown" — in that case we fall back to the old behavior (mark reauth on 401).
     if (providerResponse.statusCode === 401 && !tokenJustRefreshed) {
-      markConnectionNeedsReauth(
-        connectionId,
-        `Provider returned 401`,
-        log ?? fastify.log,
-      ).catch((err) => { (log ?? fastify.log).error({ err, connectionId }, "Failed to mark connection for reauth"); });
+      const { probeConnectionAuth } = await import("../utils/connection-health-probe");
+      const probe = await probeConnectionAuth(connection.service, connection.provider, accessToken);
+      if (probe.status !== "valid") {
+        markConnectionNeedsReauth(
+          connectionId,
+          `Provider returned 401`,
+          log ?? fastify.log,
+        ).catch((err) => { (log ?? fastify.log).error({ err, connectionId }, "Failed to mark connection for reauth"); });
+      }
     }
 
     // Log structured error metadata (same as the non-transparent path)
@@ -4453,11 +4459,23 @@ export async function executeModelBRequest(
     responseBody = truncated;
   }
 
-  // 401 handling: if the token was just refreshed successfully, the credential is
-  // valid — the 401 means a scope/permission issue (e.g., conditional access policy,
-  // missing admin consent), not an invalid token. Only mark needs_reauth when the
-  // token was NOT just refreshed (stale token, API key revoked, etc.).
-  const shouldMarkReauth = providerResponse.statusCode === 401 && !tokenJustRefreshed;
+  // 401 handling: a 401 doesn't necessarily mean the credential is invalid — it
+  // could be a scope/permission issue (conditional access, missing admin consent,
+  // endpoint-specific permission). To distinguish, we probe the service's health
+  // endpoint (same URL the "test" button uses). If the probe succeeds, the
+  // credential is valid and this is a permission issue — don't mark needs_reauth.
+  // If tokenJustRefreshed, we already know it's valid and skip the probe.
+  let credentialValid = tokenJustRefreshed;
+  let probeStatus: "skipped" | "valid" | "invalid" | "unknown" = tokenJustRefreshed ? "skipped" : "unknown";
+
+  if (providerResponse.statusCode === 401 && !tokenJustRefreshed) {
+    const { probeConnectionAuth } = await import("../utils/connection-health-probe");
+    const probe = await probeConnectionAuth(connection.service, connection.provider, accessToken);
+    probeStatus = probe.status;
+    credentialValid = probe.status === "valid";
+  }
+
+  const shouldMarkReauth = providerResponse.statusCode === 401 && !credentialValid;
 
   if (providerResponse.statusCode === 401) {
     const wwwAuth = providerResponse.headers["www-authenticate"];
@@ -4465,10 +4483,12 @@ export async function executeModelBRequest(
       {
         connectionId,
         provider: connection.provider,
+        service: connection.service,
         statusCode: providerResponse.statusCode,
         responseBody: responseBody?.substring(0, 500),
         wwwAuthenticate: Array.isArray(wwwAuth) ? wwwAuth[0] : wwwAuth,
         tokenJustRefreshed,
+        probeStatus,
         markedNeedsReauth: shouldMarkReauth,
       },
       "vault.exec.provider.authFailure",
