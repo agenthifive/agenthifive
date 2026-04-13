@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@agenthifive/contracts": "workspace:*",
-    "oauth4webapi": "^3.3.0"
+    "oauth4webapi": "^3.8.5"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
