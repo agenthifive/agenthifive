@@ -70,6 +70,11 @@ const config: Config = {
           position: "left",
         },
         {
+          href: "https://app.agenthifive.com/login",
+          label: "Log In",
+          position: "right",
+        },
+        {
           href: "https://github.com/supersantux/AgentH5",
           label: "GitHub",
           position: "right",
