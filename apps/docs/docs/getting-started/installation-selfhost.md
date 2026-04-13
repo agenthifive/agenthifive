@@ -25,8 +25,8 @@ Run the complete AgentHiFive stack on your own infrastructure. You get full cont
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/AH5-AgentHiFive/AgentH5.git
-cd AgentH5
+git clone https://github.com/agenthifive/agenthifive-enterprise.git
+cd agenthifive-enterprise
 ```
 
 ## Step 2: Install Prerequisites
@@ -132,8 +132,8 @@ For headless servers or long-running sessions, use `make dev-ul` to run in the b
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/AH5-AgentHiFive/AgentH5.git
-cd AgentH5
+git clone https://github.com/agenthifive/agenthifive-enterprise.git
+cd agenthifive-enterprise
 ```
 
 ## Step 2: Configure Environment Variables
@@ -399,7 +399,7 @@ You should see:
 
 Before exposing your instance to the internet:
 
-- [ ] **TLS enabled** — terminate HTTPS at a reverse proxy (Nginx, Caddy, or a cloud load balancer). See the [production Nginx template](https://github.com/AH5-AgentHiFive/AgentH5/blob/main/infra/nginx/prod.conf.template) for a full TLS configuration with Let's Encrypt.
+- [ ] **TLS enabled** — terminate HTTPS at a reverse proxy (Nginx, Caddy, or a cloud load balancer). See the [production Nginx template](https://github.com/agenthifive/agenthifive-enterprise/blob/main/infra/nginx/prod.conf.template) for a full TLS configuration with Let's Encrypt.
 - [ ] **Strong secrets** — `ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` generated with `openssl rand -hex 32`, not dev defaults
 - [ ] **Database TLS** — `DATABASE_URL` includes `?sslmode=require` (or `verify-full` if your provider supports it)
 - [ ] **Internal JWKS** — `WEB_JWKS_URL` points to an internal address (e.g., `http://api:4000/.well-known/jwks.json`), not exposed publicly

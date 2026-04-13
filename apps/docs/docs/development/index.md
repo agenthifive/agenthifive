@@ -20,7 +20,7 @@ This guide covers how to set up your development environment, contribute code, a
 AgentHiFive is a monorepo managed with **pnpm workspaces** and **Turborepo**:
 
 ```
-AgentH5/
+agenthifive-enterprise/
   apps/
     web/          # Next.js 16 frontend (dashboard)
     api/          # Fastify 5.x backend (API gateway)
@@ -40,8 +40,8 @@ AgentH5/
 
 ```bash
 # Clone the repository
-git clone https://github.com/AgentHiFive/AgentH5.git
-cd AgentH5
+git clone https://github.com/agenthifive/agenthifive-enterprise.git
+cd agenthifive-enterprise
 
 # Initialize the project (install dependencies, start Docker services, run migrations)
 make init

@@ -6,11 +6,11 @@ const baseUrl = process.env.DOCS_BASE_URL || "/";
 const config: Config = {
   title: "AgentHiFive",
   tagline: "Authority delegation and permission control for AI agents",
-  favicon: "img/favicon.ico",
+  favicon: "img/logo.svg",
   url: "https://docs.agenthifive.com",
   baseUrl,
-  organizationName: "AgentHiFive",
-  projectName: "AgentH5",
+  organizationName: "agenthifive",
+  projectName: "agenthifive",
 
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
@@ -28,7 +28,7 @@ const config: Config = {
           routeBasePath: "/",
           sidebarPath: "./sidebars.ts",
           editUrl:
-            "https://github.com/supersantux/AgentH5/tree/main/apps/docs/",
+            "https://github.com/agenthifive/agenthifive/tree/main/apps/docs/",
         },
         blog: false,
         theme: {
@@ -74,11 +74,7 @@ const config: Config = {
           label: "Log In",
           position: "right",
         },
-        {
-          href: "https://github.com/supersantux/AgentH5",
-          label: "GitHub",
-          position: "right",
-        },
+        { href: "https://agenthifive.com", label: "Website", position: "right" },
       ],
     },
     footer: {
@@ -105,10 +101,8 @@ const config: Config = {
         {
           title: "More",
           items: [
-            {
-              label: "GitHub",
-              href: "https://github.com/supersantux/AgentH5",
-            },
+            { label: "Website", href: "https://agenthifive.com" },
+            { label: "App", href: "https://app.agenthifive.com/login" },
           ],
         },
       ],
