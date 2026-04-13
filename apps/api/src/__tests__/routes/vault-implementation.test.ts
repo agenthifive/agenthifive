@@ -1614,7 +1614,7 @@ describe("Vault Execute - Model B (Brokered Proxy) [DB Integrated]", () => {
     assert.ok(body.hint.includes("100 bytes"), "Hint should mention the configured limit");
   });
 
-  it("marks connection needs_reauth on 401 from provider", async () => {
+  it("does NOT mark needs_reauth on 401 from provider after successful OAuth refresh", async () => {
     // Mock undici to return 401
     mockUndiciResponse = {
       statusCode: 401,
@@ -1639,14 +1639,18 @@ describe("Vault Execute - Model B (Brokered Proxy) [DB Integrated]", () => {
     const body = res.json();
     assert.equal(body.status, 401);
 
+    // OAuth connections refresh before use; if refresh succeeded, a 401 on the
+    // provider call should not immediately mark the connection as broken.
+    assert.equal(mockRefreshFn.mock.calls.length, 1, "OAuth connection should refresh before proxying the request");
+
     // Wait a tick for fire-and-forget DB update
     await new Promise((r) => setTimeout(r, 100));
 
-    // Verify connection marked as needs_reauth
+    // Verify connection stays healthy after a just-refreshed 401
     const [conn] = await db.select({ status: connections.status })
       .from(connections)
       .where(eq(connections.id, testConnectionId));
-    assert.equal(conn!.status, "needs_reauth");
+    assert.equal(conn!.status, "healthy");
   });
 
   it("does NOT mark needs_reauth on 403 for bot_token connection", async () => {
