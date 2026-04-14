@@ -1,24 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="tile" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#163D37"/>
-      <stop offset="1" stop-color="#081816"/>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#103631"/>
+      <stop offset="1" stop-color="#081917"/>
     </linearGradient>
-    <linearGradient id="mark" x1="18" y1="14" x2="46" y2="49" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#52E2A6"/>
-      <stop offset="0.58" stop-color="#1FA778"/>
+    <linearGradient id="shield" x1="19" y1="14" x2="44" y2="51" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#43D998"/>
+      <stop offset="0.58" stop-color="#1E9F74"/>
       <stop offset="1" stop-color="#2F7DF4"/>
     </linearGradient>
-    <radialGradient id="wash" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(20 15) rotate(39.4) scale(34.7002)">
-      <stop stop-color="#9CF6CF" stop-opacity=".55"/>
-      <stop offset="1" stop-color="#9CF6CF" stop-opacity="0"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(21 16) rotate(44.5) scale(34.6712)">
+      <stop stop-color="#8FF3C8" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#8FF3C8" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#tile)"/>
-  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#wash)"/>
-  <path d="M32 12.5 45.5 18v11.3c0 8.6-5.5 16.4-13.5 19-8-2.6-13.5-10.4-13.5-19V18l13.5-5.5Z" fill="url(#mark)"/>
-  <path d="M32 17.5 41.5 21.4v8.3c0 5.9-3.7 11.3-9.5 13.3-5.8-2-9.5-7.4-9.5-13.3v-8.3l9.5-3.9Z" fill="#F6FFFC" fill-opacity=".18"/>
-  <path d="M26 30.5c0-3.3 2.7-6 6-6s6 2.7 6 6v.5h2.5c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2h-17c-1.1 0-2-.9-2-2v-9c0-1.1.9-2 2-2H26v-.5Z" fill="#F7FFFC"/>
-  <path d="M28.75 30.75v-.5a3.25 3.25 0 1 1 6.5 0v.5" stroke="#163D37" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M32 35a2.5 2.5 0 0 1 1.25 4.66V42h-2.5v-2.34A2.5 2.5 0 0 1 32 35Z" fill="#163D37"/>
+  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#bg)"/>
+  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#glow)"/>
+  <path d="M32 12 46 18.2V29c0 9.1-5.8 17.3-14 20-8.2-2.7-14-10.9-14-20V18.2L32 12Z" fill="url(#shield)"/>
+  <path d="M27.5 30.5v-3.3a4.5 4.5 0 0 1 9 0v3.3" stroke="#F5FFFB" stroke-width="3" stroke-linecap="round"/>
+  <rect x="23.5" y="30" width="17" height="14" rx="4" fill="#F5FFFB"/>
+  <path d="M32 35.2a2.3 2.3 0 0 1 1.1 4.4v2.2h-2.2v-2.2a2.3 2.3 0 0 1 1.1-4.4Z" fill="#0E3A34"/>
 </svg>
