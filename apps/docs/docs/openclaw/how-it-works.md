@@ -10,6 +10,12 @@ description: Technical architecture of the AgentHiFive + OpenClaw integration â€
 
 The AgentHiFive + OpenClaw integration makes AgentHiFive the credential backend for OpenClaw so that provider tokens (LLM API keys, bot tokens, OAuth credentials) never live on disk. Instead of storing API keys in OpenClaw's configuration files, all credentials are managed centrally in the AgentHiFive Vault and injected at runtime through a combination of compiled-JS patching, URL rewriting, and a shared in-process runtime bridge.
 
+:::note Current compatibility model
+The compiled-JS patching described on this page is the supported path for
+vault-managed LLM proxying today. It is intentionally temporary while the
+upstream OpenClaw contribution for native support is being processed.
+:::
+
 The integration consists of two packages:
 
 - **`@agenthifive/openclaw-setup`** -- A setup CLI that bootstraps the agent, patches OpenClaw's compiled JS, rewrites model provider config, and installs the plugin.
@@ -87,6 +93,9 @@ Using a short-lived JWT obtained via the new key pair, the CLI calls `GET /v1/ca
 The plugin package is copied to OpenClaw's `~/.openclaw/extensions/agenthifive` directory. This directory is scanned by OpenClaw's plugin loader at startup, which calls `register(api)` on the plugin entry point.
 
 ### 4. Patch OpenClaw's compiled JS
+
+This is the current compatibility step for LLM credential proxying. It is meant
+to disappear once upstream OpenClaw exposes the needed native hook/result surface.
 
 The auto-patcher finds all JS chunks in OpenClaw's `dist/` that contain `resolveApiKeyForProvider` and applies two patches:
 

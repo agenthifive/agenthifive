@@ -9,6 +9,10 @@ description: Full reference for the @agenthifive/openclaw-setup CLI — interact
 
 The `@agenthifive/openclaw-setup` package (v0.2.18) is a standalone CLI that connects an [OpenClaw](https://openclaw.dev) installation to the AgentHiFive vault. It handles agent registration, ES256 key pair generation, LLM proxy configuration, plugin installation, runtime patching, channel setup, and diagnostics.
 
+Today, the runtime patching step is the supported compatibility path for
+vault-managed LLM proxying in OpenClaw. It is intended to be temporary until the
+upstream OpenClaw contribution for native support is processed.
+
 The binary name is **`ah5-setup`**.
 
 ## Installation
@@ -177,7 +181,9 @@ Builds a config block and deep-merges it into the existing `openclaw.json`. The 
 
 ### Step 7 -- Patch OpenClaw runtime
 
-Applies two patches to OpenClaw's compiled JavaScript:
+Applies two patches to OpenClaw's compiled JavaScript. This is the supported
+temporary compatibility layer for LLM proxying until OpenClaw ships the needed
+native integration surface:
 
 1. **Credential resolution patch** -- Injected into every dist chunk containing `resolveApiKeyForProvider()`. Adds vault credential resolution before local profile lookup:
    - **Tier 0 (proxied providers):** If the provider is vault-managed, returns the vault bearer token directly as the API key with source `"vault:agent-token"`.

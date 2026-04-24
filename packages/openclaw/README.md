@@ -27,7 +27,7 @@ npm install -g /path/to/agenthifive-openclaw-setup-0.2.17.tgz
 
 ### 3. Run setup
 
-Run the setup wizard to bootstrap agent auth, discover connected services, write config, and apply the credential proxying patch:
+Run the setup wizard to bootstrap agent auth, discover connected services, write config, and apply the temporary credential proxying patch used until native OpenClaw support lands:
 
 ```bash
 ah5-setup
@@ -41,7 +41,7 @@ ah5-setup --base-url https://app.agenthifive.com --bootstrap-secret ah5b_...
 
 The wizard automatically:
 - Writes canonical AgentHiFive config to `~/.openclaw/openclaw.json`
-- Applies the credential proxying patch to your OpenClaw installation
+- Applies the temporary credential proxying patch to your OpenClaw installation
 
 After setup:
 - Changing models from the OpenClaw TUI `/models` picker is fine
@@ -132,11 +132,15 @@ Important keys under `channels.agenthifive.accounts.<id>`:
 
 The setup wizard automatically patches OpenClaw's `resolveApiKeyForProvider()` to route LLM API calls through the vault, so agents don't need local API keys.
 
+This patch-based flow is the **officially supported path today** for vault-managed
+LLM calls. It is a temporary compatibility layer while the upstream OpenClaw
+contribution for native support is being processed.
+
 The patch is applied during `ah5-setup` and:
 - Works with both npm installs (`dist/` chunks) and source installs (`src/`)
 - Creates a `.bak` backup of the patched file
 - Is idempotent (safe to run multiple times)
-- Uses dynamic imports — no-op when the plugin is not installed
+- Uses the shared `globalThis.__ah5_runtime` bridge, so it is a no-op when the plugin is not installed
 
 To re-apply manually (for example after an OpenClaw upgrade), re-run the setup wizard or see [`patches/README.md`](patches/README.md).
 

@@ -9,6 +9,16 @@ description: Route delegated access through AgentHiFive so provider tokens never
 
 AgentHiFive integrates with [OpenClaw](https://github.com/anthropics/openclaw) to provide secure, auditable authority delegation for AI agents. Instead of storing OAuth refresh tokens or LLM API keys on the agent host, AgentHiFive acts as the credential boundary: the agent runtime never sees provider secrets, and every action is policy-checked and audit-logged.
 
+:::note Temporary patch path for LLM proxying
+Today, vault-managed LLM proxying in OpenClaw uses a setup-applied compatibility
+patch. That is the supported production path right now, and it is intended to be
+temporary until the upstream OpenClaw contribution for native support is processed.
+
+The rest of the AgentHiFive integration story does not depend on upstream core
+changes: the plugin, tools, approvals, prompt injection, channels, and brokered
+API execution already work today.
+:::
+
 ## The problem today
 
 OpenClaw agents store auth profiles and API keys locally. On VPS and remote gateway deployments this creates two issues:
@@ -33,7 +43,7 @@ A combined **generic plugin** and **channel plugin** that runs in-process with t
 
 ### Setup CLI (`@agenthifive/openclaw-setup`)
 
-A standalone CLI that bootstraps an OpenClaw agent with AgentHiFive. It handles first-time setup, model selection, and reconnection. Critically, it **patches OpenClaw's compiled JavaScript** to intercept credential resolution at runtime, redirecting LLM API calls through the vault.
+A standalone CLI that bootstraps an OpenClaw agent with AgentHiFive. It handles first-time setup, model selection, and reconnection. Critically, it **patches OpenClaw's compiled JavaScript** to intercept credential resolution at runtime, redirecting LLM API calls through the vault. This patch is the current compatibility mechanism until upstream native support lands.
 
 ### MCP Server (`agenthifive-mcp`)
 
@@ -64,7 +74,7 @@ See the [MCP Server](./mcp-server.md) guide for setup instructions.
 ### Setup and patching
 
 1. **Bootstrap.** The setup CLI generates an ES256 key pair, registers the agent with the AgentHiFive vault using a bootstrap secret, and stores the private key locally.
-2. **Patch.** The CLI locates OpenClaw's compiled JS chunks (or TypeScript source) and injects code into `resolveApiKeyForProvider()`. The patch adds two tiers before OpenClaw's normal local profile resolution:
+2. **Patch.** The CLI locates OpenClaw's compiled JS chunks (or TypeScript source) and injects code into `resolveApiKeyForProvider()`. This is the supported temporary compatibility layer until OpenClaw exposes a native hook result for the same behavior. The patch adds two tiers before OpenClaw's normal local profile resolution:
    - **Tier 0 (Proxied providers):** For LLM providers marked as vault-managed, the patch returns the vault bearer token directly as the API key.
    - **Tier 0.5 (Credential provider chain):** For other providers, the patch queries the vault's credential provider before falling back to local profiles.
 3. **Base URL rewrite.** LLM provider base URLs are rewritten to `{vaultUrl}/v1/vault/llm/{provider}`, so all LLM API traffic routes through the vault's Model B proxy.

@@ -2,6 +2,10 @@
 
 Optional patches that enable LLM credential proxying in OpenClaw core.
 
+These patches are the **supported compatibility path today** while the native
+OpenClaw contribution is still being processed upstream. They are intended to
+be temporary, not a permanent fork of OpenClaw behavior.
+
 **These patches are NOT required for basic functionality.** The AgentHiFive plugin
 works fully without patches — tools, prompt injection, approval flow, and the
 brokered API proxy (Model B) all work out of the box. Patches only enable
@@ -31,7 +35,7 @@ The patch uses `globalThis.__ah5_runtime` (no dynamic imports), so it's a
 
 ## How to Apply
 
-### Automatic (recommended)
+### Automatic (recommended for current releases)
 
 ```bash
 npx @agenthifive/openclaw-setup --base-url https://app.agenthifive.com --bootstrap-secret ah5b_...
@@ -65,5 +69,5 @@ AgentHiFive: model-auth patch not detected. LLM credential proxying is unavailab
 ## When Patches Become Unnecessary
 
 When OpenClaw merges support for `apiKeyOverride` in the `before_model_resolve`
-hook result type, the plugin can use the hook API directly and patches will be
-deprecated.
+hook result type, the plugin can use the hook API directly and these patches
+will be deprecated and removed from the normal setup flow.
