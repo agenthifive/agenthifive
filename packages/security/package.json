@@ -16,9 +16,9 @@
     "jose": "^5.9.3"
   },
   "optionalDependencies": {
-    "@azure/identity": "^4.0.0",
+    "@azure/identity": "^4.13.1",
     "@azure/keyvault-keys": "^4.0.0",
-    "@azure/keyvault-secrets": "^4.0.0"
+    "@azure/keyvault-secrets": "^4.11.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
