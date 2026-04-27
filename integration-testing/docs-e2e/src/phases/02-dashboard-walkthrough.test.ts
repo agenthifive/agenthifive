@@ -19,8 +19,8 @@ import { writeFileSync } from "node:fs";
 const QS_DOC = "getting-started/quickstart.md";
 const FIXTURE_PATH = process.env["DOCS_E2E_FIXTURE_PATH"] || "/tmp/docs-e2e-fixture.json";
 
-const GOOGLE_TEST_EMAIL = "GOOGLE_TEST_EMAIL";
-const GOOGLE_TEST_PASSWORD = "GOOGLE_TEST_PASSWORD";
+const GOOGLE_TEST_EMAIL = process.env["GOOGLE_TEST_EMAIL"] || "";
+const GOOGLE_TEST_PASSWORD = process.env["GOOGLE_TEST_PASSWORD"] || "";
 
 // Shared state across tests
 let browser: Browser;
@@ -186,6 +186,10 @@ describe("Phase 2: Dashboard Walkthrough", () => {
 
   it("Step 5: Create Google OAuth connection (Quickstart Step 4)", async () => {
     if (!jwt) { console.log("[phase2] Skipping — no JWT"); return; }
+    if (!GOOGLE_TEST_EMAIL || !GOOGLE_TEST_PASSWORD) {
+      console.log("[phase2] Skipping — GOOGLE_TEST_EMAIL and GOOGLE_TEST_PASSWORD are required");
+      return;
+    }
 
     // Start OAuth flow via API
     const startRes = await fetch(`${API_URL}/v1/connections/start`, {
