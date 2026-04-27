@@ -45,7 +45,7 @@
     "nodemailer": "^8.0.1",
     "oauth4webapi": "^3.3.0",
     "postgres": "^3.4.0",
-    "undici": "^7.21.0",
+    "undici": "^8.1.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
