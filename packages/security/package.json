@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@agenthifive/contracts": "workspace:*",
-    "jose": "^5.9.3"
+    "jose": "^6.2.3"
   },
   "optionalDependencies": {
     "@azure/identity": "^4.0.0",
