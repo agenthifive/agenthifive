@@ -74,7 +74,7 @@ const configSchema = {
   },
 };
 
-export default sdk.defineChannelPluginEntry({
+const entry = sdk.defineChannelPluginEntry({
   id: "agenthifive",
   name: "AgentHiFive Channels",
   description: "Vault-managed Telegram and Slack channel plugin",
@@ -85,3 +85,20 @@ export default sdk.defineChannelPluginEntry({
     registerAgentHiFivePlugin(api);
   },
 });
+
+const agentHiFiveChannelEntry: any = {
+  ...entry,
+  register(api: Parameters<typeof entry.register>[0]) {
+    entry.register(api);
+
+    // Latest OpenClaw can activate configured channel plugins in setup-runtime
+    // mode. The SDK channel helper intentionally skips registerFull there, but
+    // AgentHiFive's vault tools and auth bridge must still be available to the
+    // running agent.
+    if (api.registrationMode === "setup-runtime") {
+      registerAgentHiFivePlugin(api);
+    }
+  },
+};
+
+export default agentHiFiveChannelEntry;

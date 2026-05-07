@@ -82,4 +82,33 @@ describe("package entrypoints", () => {
     assert.equal(registeredTools.length, 7);
     assert.ok(handlers.some((entry) => entry.event === "before_agent_start"));
   });
+
+  it("registers vault tools when latest OpenClaw loads channel setup-runtime", async () => {
+    const registeredTools: Array<{ name?: string }> = [];
+    const handlers: Array<{ event: string; handler: unknown }> = [];
+
+    channelPlugin.register({
+      registrationMode: "setup-runtime",
+      pluginConfig: {
+        baseUrl: "https://vault.example.com",
+        auth: { mode: "bearer", token: "ah5t_demo" },
+        proxiedProviders: ["gemini"],
+        connectedProviders: ["telegram", "gmail"],
+      },
+      config: {},
+      runtime: {},
+      logger: {
+        info: () => undefined,
+        warn: () => undefined,
+        error: () => undefined,
+      },
+      registerChannel: () => undefined,
+      registerTool: (tool: { name?: string }) => registeredTools.push(tool),
+      on: (event: string, handler: unknown) => handlers.push({ event, handler }),
+    });
+
+    assert.ok(registeredTools.some((tool) => tool.name === "vault_connections_list"));
+    assert.ok(registeredTools.some((tool) => tool.name === "vault_execute"));
+    assert.ok(handlers.some((entry) => entry.event === "before_agent_start"));
+  });
 });
