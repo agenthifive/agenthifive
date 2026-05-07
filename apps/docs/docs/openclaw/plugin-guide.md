@@ -164,13 +164,13 @@ When the vault returns HTTP 202 with `approvalRequired: true`, the proxy returns
 ## Installation
 
 ```bash
-openclaw plugins install @agenthifive/agenthifive
+openclaw plugins install @agenthifive/agenthifive@0.4.7
 ```
 
 Or add it to your `package.json` directly:
 
 ```bash
-npm install @agenthifive/agenthifive
+npm install @agenthifive/agenthifive@0.4.7
 ```
 
 ## Configuration

@@ -74,7 +74,7 @@ The integration consists of two packages:
 
 ## Setup Phase
 
-The setup CLI (`npx @agenthifive/openclaw-setup`) performs a multi-step bootstrap that connects an OpenClaw installation to AgentHiFive. The wizard supports three modes: first-time setup, reconnect (new bootstrap secret), and change-default-model.
+The setup CLI (`npx @agenthifive/openclaw-setup@0.2.19`) performs a multi-step bootstrap that connects an OpenClaw installation to AgentHiFive. The wizard supports three modes: first-time setup, reconnect (new bootstrap secret), and change-default-model.
 
 ### 1. Bootstrap the agent
 

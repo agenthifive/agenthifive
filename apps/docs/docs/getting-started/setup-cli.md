@@ -20,13 +20,13 @@ The binary name is **`ah5-setup`**.
 Run directly with npx (no install required):
 
 ```bash
-npx @agenthifive/openclaw-setup
+npx @agenthifive/openclaw-setup@0.2.19
 ```
 
 Or install globally for the `ah5-setup` command:
 
 ```bash
-npm install -g @agenthifive/openclaw-setup
+npm install -g @agenthifive/openclaw-setup@0.2.19
 ah5-setup
 ```
 
@@ -147,7 +147,7 @@ Skipped if `--skip-onboard` is passed or OpenClaw is already onboarded.
 
 ### Step 3 -- Install plugin
 
-Runs `openclaw plugins install @agenthifive/agenthifive` if the plugin is not already present in OpenClaw's plugin install directory. Recent OpenClaw versions install npm plugins under `~/.openclaw/npm/node_modules/`; older versions may use `~/.openclaw/extensions/`. Restarts the gateway afterwards. Skipped if `--skip-plugin-install` is passed.
+Runs `openclaw plugins install @agenthifive/agenthifive@0.4.7` if the plugin is not already present in OpenClaw's plugin install directory. Recent OpenClaw versions install npm plugins under `~/.openclaw/npm/node_modules/`; older versions may use `~/.openclaw/extensions/`. Restarts the gateway afterwards. Skipped if `--skip-plugin-install` is passed.
 
 ### Step 4 -- Bootstrap agent
 
@@ -283,7 +283,7 @@ Note: The remove command does not restore patched dist chunks. If you need to re
 ### First-time setup (interactive)
 
 ```bash
-npx @agenthifive/openclaw-setup
+npx @agenthifive/openclaw-setup@0.2.19
 # Select "First connection to vault"
 # Enter base URL and bootstrap secret when prompted
 ```
@@ -291,7 +291,7 @@ npx @agenthifive/openclaw-setup
 ### First-time setup (non-interactive / CI)
 
 ```bash
-npx @agenthifive/openclaw-setup \
+npx @agenthifive/openclaw-setup@0.2.19 \
   --non-interactive \
   --base-url https://app.agenthifive.com \
   --bootstrap-secret ah5b_...
