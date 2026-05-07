@@ -6,6 +6,17 @@
   "channels": [
     "agenthifive"
   ],
+  "contracts": {
+    "tools": [
+      "vault_execute",
+      "request_permission",
+      "request_capability",
+      "vault_await_approval",
+      "vault_connections_list",
+      "vault_connection_revoke",
+      "vault_download"
+    ]
+  },
   "channelConfigs": {
     "agenthifive": {
       "label": "AgentHiFive",

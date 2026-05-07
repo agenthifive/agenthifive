@@ -52,6 +52,15 @@ describe("package entrypoints", () => {
     assert.equal(manifest.version, pkg.version);
     assert.ok(manifest.channelConfigs?.agenthifive?.schema);
     assert.ok(manifest.configSchema.properties.proxiedProviders);
+    assert.deepEqual(manifest.contracts?.tools, [
+      "vault_execute",
+      "request_permission",
+      "request_capability",
+      "vault_await_approval",
+      "vault_connections_list",
+      "vault_connection_revoke",
+      "vault_download",
+    ]);
   });
 
   it("accepts latest OpenClaw nested plugin config shape", async () => {
