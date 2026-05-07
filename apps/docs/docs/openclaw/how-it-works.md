@@ -19,7 +19,7 @@ upstream OpenClaw contribution for native support is being processed.
 The integration consists of two packages:
 
 - **`@agenthifive/openclaw-setup`** -- A setup CLI that bootstraps the agent, patches OpenClaw's compiled JS, rewrites model provider config, and installs the plugin.
-- **`@agenthifive/openclaw`** -- The OpenClaw plugin that registers vault tools, manages token lifecycle, runs approval watchers, and populates the runtime bridge.
+- **`@agenthifive/agenthifive`** -- The OpenClaw plugin that registers vault tools, manages token lifecycle, runs approval watchers, and populates the runtime bridge.
 
 ## Architecture Diagram
 

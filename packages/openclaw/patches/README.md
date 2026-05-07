@@ -48,7 +48,7 @@ The setup wizard applies the patch automatically as step 7/7.
 ```bash
 pnpm patch openclaw
 cd <temp-directory>
-patch -p1 < /path/to/@agenthifive/openclaw/patches/model-auth.patch
+patch -p1 < /path/to/@agenthifive/agenthifive/patches/model-auth.patch
 pnpm patch-commit <temp-directory>
 ```
 

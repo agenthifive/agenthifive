@@ -47,8 +47,8 @@ No servers required — use the hosted platform:
 2. Connect your accounts and configure policies
 3. Install the OpenClaw plugin:
    ```bash
-   openclaw plugins install @agenthifive/openclaw
-   npx @agenthifive/openclaw-setup
+   openclaw plugins install @agenthifive/agenthifive@0.4.7
+   npx @agenthifive/openclaw-setup@0.2.19
    ```
 
 → [Full SaaS Setup Guide](https://docs.agenthifive.com/getting-started/installation-saas)
@@ -81,8 +81,8 @@ make dev                      # Start web (:3000) + api (:4000)
 For [OpenClaw](https://github.com/openclaw/openclaw) users:
 
 ```bash
-openclaw plugins install @agenthifive/openclaw
-npx @agenthifive/openclaw-setup
+openclaw plugins install @agenthifive/agenthifive@0.4.7
+npx @agenthifive/openclaw-setup@0.2.19
 ```
 
 → [Plugin Guide](https://docs.agenthifive.com/openclaw/plugin-guide)

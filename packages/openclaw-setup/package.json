@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supersantux/AgentH5.git",
+    "url": "https://github.com/agenthifive/agenthifive.git",
     "directory": "packages/openclaw-setup"
   },
   "keywords": [

@@ -7,7 +7,7 @@ description: Install, configure, and use the @agenthifive/agenthifive Gateway pl
 
 # Gateway Plugin Guide
 
-The `@agenthifive/agenthifive` package is a first-class OpenClaw Gateway plugin that registers six tools (`vault_execute`, `request_permission`, `request_capability`, `vault_await_approval`, `vault_connections_list`, `vault_connection_revoke`). The plugin runs in-process with the Gateway (trusted boundary) and communicates with the AgentHiFive Vault to execute provider API calls, manage connections, and enforce step-up approvals.
+The `@agenthifive/agenthifive` package is a first-class OpenClaw Gateway plugin that registers seven tools (`vault_execute`, `request_permission`, `request_capability`, `vault_await_approval`, `vault_connections_list`, `vault_connection_revoke`, `vault_download`). The plugin runs in-process with the Gateway (trusted boundary) and communicates with the AgentHiFive Vault to execute provider API calls, manage connections, and enforce step-up approvals.
 
 :::tip Key invariant
 The plugin stores only Vault session credentials and connection IDs. Provider refresh tokens are **never** stored on the OpenClaw host.
@@ -21,7 +21,7 @@ The `@agenthifive/agenthifive` package serves two roles simultaneously within th
 
 As a standard OpenClaw plugin it provides:
 
-- **Vault tools** -- six tools (`vault_execute`, `request_permission`, `request_capability`, `vault_await_approval`, `vault_connections_list`, `vault_connection_revoke`) that let agents interact with provider APIs through the AgentHiFive Vault.
+- **Vault tools** -- seven tools (`vault_execute`, `request_permission`, `request_capability`, `vault_await_approval`, `vault_connections_list`, `vault_connection_revoke`, `vault_download`) that let agents interact with provider APIs through the AgentHiFive Vault.
 - **Hooks** -- a `before_agent_start` hook that injects vault reference files and a system prompt so the agent knows which services and action templates are available.
 - **Credential provider** -- a `VaultCredentialProvider` registered at startup so that OpenClaw's built-in provider routing can resolve credentials from the vault when needed.
 
@@ -265,7 +265,7 @@ registerAgentHiFivePlugin({
 
 ## Tools reference
 
-The plugin registers six tools.
+The plugin registers seven tools.
 
 ---
 
@@ -469,6 +469,34 @@ Immediately revoke a connection. This blocks all future token vending and API ex
 :::warning
 Revoking a connection is permanent. Any skills or automations that depend on this connection will stop working immediately.
 :::
+
+---
+
+### `vault_download`
+
+Download a binary file through the AgentHiFive Vault and save it to disk. Use this for attachments, Drive files, images, and other binary content. The Vault handles authentication, provider-specific decoding, and policy enforcement.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `connectionId` | `string` | No | Connection ID for multi-account services like Google or Microsoft |
+| `service` | `string` | No | Service ID for singleton services |
+| `url` | `string` | Yes | Provider API URL to download from |
+| `headers` | `object` | No | Additional headers; do not include `Authorization` |
+| `filename` | `string` | No | Suggested local filename |
+| `approvalId` | `string` | No | Approval ID from a previous step-up approval |
+
+**Response:**
+
+```typescript
+{
+  success: true,
+  path: "/tmp/ah5-downloads/report.pdf",
+  filename: "report.pdf",
+  auditId: "aud_download_01"
+}
+```
 
 ## End-to-end example: high-five approval flow
 

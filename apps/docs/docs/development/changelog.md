@@ -12,10 +12,10 @@ All packages live in the `packages/` directory of the monorepo and are published
 
 | Package | npm Name | Version | Description |
 |---------|----------|---------|-------------|
-| `openclaw` | `@agenthifive/agenthifive` | `0.4.6` | OpenClaw Gateway plugin |
+| `openclaw` | `@agenthifive/agenthifive` | `0.4.7` | OpenClaw Gateway plugin |
 | `sdk` | `@agenthifive/sdk` | `0.1.0` | Official TypeScript SDK |
 | `agenthifive-mcp` | `agenthifive-mcp` | `0.1.0` | MCP server (stdio transport) |
-| `openclaw-setup` | `@agenthifive/openclaw-setup` | `0.2.18` | Setup CLI (`ah5-setup`) |
+| `openclaw-setup` | `@agenthifive/openclaw-setup` | `0.2.19` | Setup CLI (`ah5-setup`) |
 | `contracts` | `@agenthifive/contracts` | `0.1.0` | Shared Zod schemas and TypeScript types |
 
 ## Versioning Policy
