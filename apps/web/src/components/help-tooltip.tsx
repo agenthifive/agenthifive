@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type ReactNode } from "react";
-
-const docsBaseUrl = process.env.NEXT_PUBLIC_DOCS_URL || "/docs";
+import { docsUrl } from "@/lib/docs-url";
 
 interface HelpTooltipProps {
   /** Short help text shown in the popover */
@@ -55,7 +54,7 @@ export function HelpTooltip({ children, docsPath, docsLabel = "Read the docs" }:
           </div>
           {docsPath && (
             <a
-              href={`${docsBaseUrl}${docsPath}`}
+              href={docsUrl(docsPath)}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"

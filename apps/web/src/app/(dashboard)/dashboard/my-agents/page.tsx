@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { apiFetch } from "@/lib/api-client";
+import { docsUrl } from "@/lib/docs-url";
 import { SERVICE_CATALOG, isRevocationInstant, getPolicyTemplate, getActionTemplate, type ServiceId } from "@agenthifive/contracts";
 import { toast } from "sonner";
 import { HelpTooltip } from "@/components/help-tooltip";
@@ -931,7 +932,7 @@ export default function MyAgentsPage() {
 
             <div className="flex items-center justify-between">
               <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL || "/docs"}/security/incident-response`}
+                href={docsUrl("/security/incident-response")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
