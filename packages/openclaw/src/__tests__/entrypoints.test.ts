@@ -17,6 +17,7 @@ describe("package entrypoints", () => {
     assert.equal(channelPlugin.id, "agenthifive");
     assert.equal(channelPlugin.name, "AgentHiFive Channels");
     assert.equal(typeof channelPlugin.register, "function");
+    assert.ok(channelPlugin.configSchema.schema.properties.proxiedProviders);
   });
 
   it("exports a setup entry bound to the channel plugin", () => {
@@ -48,5 +49,37 @@ describe("package entrypoints", () => {
     assert.equal(pkg.openclaw.channel.id, "agenthifive");
     assert.ok(pkg.openclaw.channel.blurb.includes("Slack"));
     assert.deepEqual(manifest.channels, ["agenthifive"]);
+    assert.equal(manifest.version, pkg.version);
+    assert.ok(manifest.channelConfigs?.agenthifive?.schema);
+    assert.ok(manifest.configSchema.properties.proxiedProviders);
+  });
+
+  it("accepts latest OpenClaw nested plugin config shape", async () => {
+    const logs: string[] = [];
+    const registeredTools: unknown[] = [];
+    const handlers: Array<{ event: string; handler: unknown }> = [];
+
+    plugin.register({
+      pluginConfig: {
+        enabled: true,
+        config: {
+          baseUrl: "https://vault.example.com",
+          auth: { mode: "bearer", token: "ah5t_demo" },
+          proxiedProviders: ["gemini"],
+          connectedProviders: ["telegram"],
+        },
+      },
+      logger: {
+        info: (msg: string) => logs.push(msg),
+        warn: (msg: string) => logs.push(msg),
+        error: (msg: string) => logs.push(msg),
+      },
+      registerTool: (tool: unknown) => registeredTools.push(tool),
+      on: (event: string, handler: unknown) => handlers.push({ event, handler }),
+    });
+
+    assert.ok(logs.some((line) => line.includes("ready")));
+    assert.equal(registeredTools.length, 7);
+    assert.ok(handlers.some((entry) => entry.event === "before_agent_start"));
   });
 });

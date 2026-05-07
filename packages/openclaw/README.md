@@ -16,7 +16,7 @@ OpenClaw plugin for [AgentHiFive](https://agenthifive.com) vault integration. Gi
 ### 1. Install the plugin
 
 ```bash
-openclaw plugins install /path/to/agenthifive-agenthifive-0.4.5.tgz
+openclaw plugins install /path/to/agenthifive-agenthifive-0.4.7.tgz
 ```
 
 ### 2. Install the setup CLI

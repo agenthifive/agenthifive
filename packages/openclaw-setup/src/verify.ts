@@ -256,45 +256,38 @@ function checkBroadcastBridge(install: OpenClawInstall): void {
 function checkPlugin(): void {
   heading("Plugin");
 
+  const installCandidates = [
+    path.join(os.homedir(), ".openclaw", "npm", "node_modules", "@agenthifive", "agenthifive"),
+    path.join(os.homedir(), ".openclaw", "npm", "node_modules", "agenthifive"),
+    path.join(os.homedir(), ".openclaw", "extensions", "agenthifive"),
+    path.join(os.homedir(), ".openclaw", "extensions", "@agenthifive"),
+    path.join(os.homedir(), ".openclaw", "extensions", "@agenthifive", "agenthifive"),
+    path.join(os.homedir(), ".openclaw", "extensions", "@agenthifive", "openclaw"),
+  ];
+  const pluginDir = installCandidates.find((candidate) => existsSync(candidate)) ?? null;
+
+  if (pluginDir) {
+    ok(`Installed at ${pluginDir}`);
+
+    const pkgPath = path.join(pluginDir, "package.json");
+    if (existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
+        info(`Version: ${pkg.version ?? "unknown"}`);
+      } catch {
+        // ignore
+      }
+    }
+    return;
+  }
+
   const extensionsDir = path.join(os.homedir(), ".openclaw", "extensions");
   if (!existsSync(extensionsDir)) {
-    warn(`Extensions directory not found: ${extensionsDir}`);
+    warn(`Plugin install directories not found under ~/.openclaw/npm or ${extensionsDir}`);
     return;
   }
 
-  const candidates = ["agenthifive", "@agenthifive"];
-  let pluginDir: string | null = null;
-
-  for (const name of candidates) {
-    const candidate = path.join(extensionsDir, name);
-    if (existsSync(candidate)) {
-      pluginDir = candidate;
-      break;
-    }
-  }
-
-  // Also check subdirectories (npm may nest under @agenthifive/openclaw)
-  if (!pluginDir) {
-    const atDir = path.join(extensionsDir, "@agenthifive", "openclaw");
-    if (existsSync(atDir)) pluginDir = atDir;
-  }
-
-  if (!pluginDir) {
-    fail("Plugin not installed. Run: openclaw plugins install @agenthifive/agenthifive");
-    return;
-  }
-
-  ok(`Installed at ${pluginDir}`);
-
-  const pkgPath = path.join(pluginDir, "package.json");
-  if (existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
-      info(`Version: ${pkg.version ?? "unknown"}`);
-    } catch {
-      // ignore
-    }
-  }
+  fail("Plugin not installed. Run: openclaw plugins install @agenthifive/agenthifive");
 }
 
 function checkConfig(): void {
@@ -417,7 +410,7 @@ function checkConfig(): void {
   const load = plugins?.load as Record<string, unknown> | undefined;
   if (load?.paths) {
     warn("plugins.load.paths is set — this is unnecessary and may cause issues");
-    info("Remove it from config; the plugin loads from ~/.openclaw/extensions/");
+    info("Remove it from config; the plugin loads from OpenClaw's plugin install directory.");
   }
 }
 

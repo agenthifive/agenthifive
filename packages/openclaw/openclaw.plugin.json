@@ -2,10 +2,162 @@
   "id": "agenthifive",
   "name": "AgentHiFive Vault",
   "description": "Vault-managed credentials, brokered API proxy, and native channel-plugin integration for AI agents",
-  "version": "0.4.5",
+  "version": "0.4.7",
   "channels": [
     "agenthifive"
   ],
+  "channelConfigs": {
+    "agenthifive": {
+      "label": "AgentHiFive",
+      "description": "Vault-managed Telegram and Slack channels with policy enforcement and approvals.",
+      "schema": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable or disable the AgentHiFive channel bridge."
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "AgentHiFive Vault API base URL.",
+            "default": "https://app.agenthifive.com"
+          },
+          "debug_level": {
+            "type": "string",
+            "enum": ["silent", "error", "warn", "info", "debug"],
+            "description": "AgentHiFive channel logging verbosity.",
+            "default": "error"
+          },
+          "debugLevel": {
+            "type": "string",
+            "enum": ["silent", "error", "warn", "info", "debug"],
+            "description": "AgentHiFive channel logging verbosity.",
+            "default": "error"
+          },
+          "auth": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["bearer", "agent"]
+              },
+              "token": {
+                "type": "string"
+              },
+              "agentId": {
+                "type": "string"
+              },
+              "privateKey": {
+                "anyOf": [
+                  { "type": "string" },
+                  { "type": "object", "additionalProperties": true }
+                ]
+              },
+              "tokenAudience": {
+                "type": "string"
+              }
+            }
+          },
+          "pollTimeoutMs": {
+            "type": "number",
+            "description": "Approval polling timeout in milliseconds.",
+            "default": 300000
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "description": "Approval polling interval in milliseconds.",
+            "default": 3000
+          },
+          "providers": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "telegram": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "dmPolicy": { "type": "string" },
+                  "allowFrom": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        { "type": "string" },
+                        { "type": "number" }
+                      ]
+                    }
+                  }
+                }
+              },
+              "slack": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "enabled": { "type": "boolean" }
+                }
+              }
+            }
+          },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string" },
+                "enabled": { "type": "boolean" },
+                "baseUrl": { "type": "string" },
+                "debug_level": {
+                  "type": "string",
+                  "enum": ["silent", "error", "warn", "info", "debug"]
+                },
+                "debugLevel": {
+                  "type": "string",
+                  "enum": ["silent", "error", "warn", "info", "debug"]
+                },
+                "auth": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "pollTimeoutMs": { "type": "number" },
+                "pollIntervalMs": { "type": "number" },
+                "providers": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "uiHints": {
+        "": {
+          "label": "AgentHiFive",
+          "help": "AgentHiFive vault-managed channel configuration."
+        },
+        "baseUrl": {
+          "label": "AgentHiFive Base URL",
+          "placeholder": "https://app.agenthifive.com"
+        },
+        "auth.token": {
+          "label": "Bearer Token",
+          "sensitive": true
+        },
+        "auth.privateKey": {
+          "label": "Agent Private Key",
+          "sensitive": true
+        },
+        "providers.telegram.enabled": {
+          "label": "Telegram via AgentHiFive"
+        },
+        "providers.slack.enabled": {
+          "label": "Slack via AgentHiFive"
+        }
+      }
+    }
+  },
   "configSchema": {
     "type": "object",
     "properties": {
@@ -51,10 +203,21 @@
         "description": "Approval polling interval in milliseconds (default: 3000 = 3s)",
         "default": 3000
       },
+      "proxiedProviders": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "LLM provider IDs that should use AgentHiFive vault-managed proxy credentials"
+      },
       "connectedProviders": {
         "type": "array",
         "items": { "type": "string" },
         "description": "List of connected provider names for prompt injection (e.g., ['google', 'microsoft', 'notion'])"
+      },
+      "debugLevel": {
+        "type": "string",
+        "enum": ["silent", "error", "warn", "info", "debug"],
+        "description": "AgentHiFive plugin logging verbosity",
+        "default": "error"
       }
     },
     "required": []

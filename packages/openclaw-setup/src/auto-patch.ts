@@ -114,15 +114,19 @@ function buildHeaderInjectionCode(): string {
  * differently, so we have multiple anchor patterns (tried in order).
  */
 const DIST_ANCHORS = [
+  // Source installs (OpenClaw 2026.5.x): inject immediately after params are unpacked.
+  /const \{\s*provider,\s*cfg,\s*profileId,\s*preferredProfile\s*\}\s*=\s*params;\n/,
   // Primary: exact store assignment
   /const store\s*=\s*params\.store\s*\?\?\s*ensureAuthProfileStore\(params\.agentDir\);\n/,
   // Fallback: any variable = params.store ?? ensureAuthProfileStore(...)
   /(?:const|let|var)\s+\w+\s*=\s*params\.store\s*\?\?\s*ensureAuthProfileStore\([^)]*\);\n/,
   // Fallback 2: function opening — inject right after the opening brace
+  /export async function resolveApiKeyForProvider\([^)]*\)\s*:\s*Promise<ResolvedProviderAuth>\s*\{[^\n]*\n/,
   /async function resolveApiKeyForProvider\([^)]*\)\s*\{[^\n]*\n/,
 ];
 
 const HEADER_OVERRIDE_ANCHORS = [
+  /export function applyLocalNoAuthHeaderOverride[\s\S]*?\)\s*:\s*T\s*\{[^\n]*\n/,
   /function applyLocalNoAuthHeaderOverride\([^)]*\)\s*\{[^\n]*\n/,
 ];
 
@@ -597,9 +601,22 @@ export function applySourcePatch(openclawDir: string): PatchResult {
  * Automatically detects source vs dist installs.
  */
 export function applyPatch(install: OpenClawInstall): PatchResult {
-  return install.kind === "source"
-    ? applySourcePatch(install.dir)
-    : applyDistPatch(install.dir);
+  if (install.kind !== "source") {
+    return applyDistPatch(install.dir);
+  }
+
+  const sourceResult = applySourcePatch(install.dir);
+  const distDir = path.join(install.dir, "dist");
+  if (!existsSync(distDir)) {
+    return sourceResult;
+  }
+
+  const distResult = applyDistPatch(install.dir);
+  return {
+    applied: sourceResult.applied || distResult.applied,
+    alreadyPatched: sourceResult.alreadyPatched && distResult.alreadyPatched,
+    message: `Source: ${sourceResult.message}; dist: ${distResult.message}`,
+  };
 }
 
 // ---------------------------------------------------------------------------

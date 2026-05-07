@@ -6,12 +6,19 @@ describe("patch-verify", () => {
   it("returns modelAuth: false when not running inside OpenClaw", async () => {
     // In our test environment, we're not inside an OpenClaw installation,
     // so model-auth.ts doesn't exist and the patch can't be detected.
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
     const warnings: string[] = [];
-    const result = await verifyPatches({
-      info: () => {},
-      warn: (msg: string) => warnings.push(msg),
-      error: () => {},
-    });
+    let result;
+    try {
+      result = await verifyPatches({
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+      });
+    } finally {
+      process.env.PATH = originalPath;
+    }
 
     assert.equal(result.modelAuth, false);
     assert.equal(warnings.length, 1);

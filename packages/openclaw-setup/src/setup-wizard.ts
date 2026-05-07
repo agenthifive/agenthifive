@@ -169,6 +169,9 @@ async function promptBaseUrl(
 }
 
 function isPluginInstalled(): boolean {
+  const npmPackageDir = path.join(os.homedir(), ".openclaw", "npm", "node_modules", "@agenthifive", "agenthifive");
+  if (existsSync(npmPackageDir)) return true;
+
   const extensionsDir = path.join(os.homedir(), ".openclaw", "extensions");
   if (!existsSync(extensionsDir)) return false;
   try {
@@ -328,6 +331,13 @@ function getProviderBaseUrlSlug(provider: string): string {
     return "gemini";
   }
   return provider;
+}
+
+function getProviderApi(provider: string): string | undefined {
+  if (provider === "gemini" || provider === "google") {
+    return "google-generative-ai";
+  }
+  return undefined;
 }
 
 type OpenClawModelListRow = {
@@ -519,18 +529,21 @@ export function buildConfigOutput(params: {
   // Build models.providers entries for LLM providers — redirect baseUrl
   // to the vault's LLM proxy endpoint (Model B brokered).
   // Each provider needs a `models` array (required by OpenClaw config schema).
-  const modelProviders: Record<string, { baseUrl: string; apiKey: string; models: ModelDef[] }> = {};
+  const modelProviders: Record<string, { baseUrl: string; apiKey: string; models: ModelDef[]; api?: string }> = {};
   for (const provider of params.proxiedProviders) {
     const providerModels = params.providerModels?.[provider]
       ?? DEFAULT_MODELS[provider]
       ?? [{ id: "default", name: "Default", input: ["text"] }];
 
     for (const configProvider of getProviderConfigAliases(provider)) {
-      modelProviders[configProvider] = {
+      const providerConfig: { baseUrl: string; apiKey: string; models: ModelDef[]; api?: string } = {
         baseUrl: `${params.baseUrl}/v1/vault/llm/${getProviderBaseUrlSlug(configProvider)}`,
         apiKey: "vault-managed",
         models: providerModels,
       };
+      const api = getProviderApi(configProvider);
+      if (api) providerConfig.api = api;
+      modelProviders[configProvider] = providerConfig;
     }
   }
 

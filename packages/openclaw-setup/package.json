@@ -1,6 +1,6 @@
 {
   "name": "@agenthifive/openclaw-setup",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "type": "module",
   "bin": {
     "ah5-setup": "dist/cli.js"
