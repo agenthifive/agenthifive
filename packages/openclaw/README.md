@@ -1,10 +1,10 @@
-# @agenthifive/openclaw
+# @agenthifive/agenthifive
 
 OpenClaw plugin for [AgentHiFive](https://agenthifive.com) vault integration. Gives AI agents secure, policy-governed access to user accounts through vault-managed credentials and a brokered API proxy.
 
 ## What It Does
 
-- **5 agent tools** for executing API calls through the vault (Model B brokered proxy)
+- **7 agent tools** for executing API calls, managing connections, approvals, and downloads through the vault
 - **Native channel plugins** for Telegram and Slack
 - **Step-up approval flow** for sensitive actions (user approves via dashboard)
 - **Prompt injection** with chunked API reference docs for connected services
@@ -16,13 +16,13 @@ OpenClaw plugin for [AgentHiFive](https://agenthifive.com) vault integration. Gi
 ### 1. Install the plugin
 
 ```bash
-openclaw plugins install /path/to/agenthifive-agenthifive-0.4.5.tgz
+openclaw plugins install @agenthifive/agenthifive@0.4.7
 ```
 
 ### 2. Install the setup CLI
 
 ```bash
-npm install -g /path/to/agenthifive-openclaw-setup-0.2.17.tgz
+npm install -g @agenthifive/openclaw-setup@0.2.19
 ```
 
 ### 3. Run setup
@@ -60,11 +60,13 @@ Add OAuth connections (Google, Microsoft, Slack, Telegram, etc.) and configure p
 
 | Tool | Description |
 |------|-------------|
-| `agenthifive_execute` | Execute an HTTP request through the vault proxy (Model B) |
-| `agenthifive_approval_request` | Create a step-up approval request for sensitive actions |
-| `agenthifive_approval_commit` | Wait for an approval to be resolved |
-| `agenthifive_connections_list` | List available connections and their status |
-| `agenthifive_connection_revoke` | Revoke a connection immediately |
+| `vault_execute` | Execute an HTTP request through the vault proxy (Model B) |
+| `request_permission` | Request permission for a sensitive action |
+| `request_capability` | Request access to a new service/capability |
+| `vault_await_approval` | Wait for a step-up approval to be resolved |
+| `vault_connections_list` | List available connections and their status |
+| `vault_connection_revoke` | Revoke a connection immediately |
+| `vault_download` | Download binary files through the vault to disk |
 
 ## Configuration
 
@@ -159,7 +161,7 @@ That removes `channels.agenthifive` from config and then uninstalls the plugin c
 The package also exports classes for use outside the plugin system:
 
 ```typescript
-import { VaultClient, VaultTokenManager, VaultActionProxy } from "@agenthifive/openclaw";
+import { VaultClient, VaultTokenManager, VaultActionProxy } from "@agenthifive/agenthifive";
 
 // Direct API client
 const client = new VaultClient({

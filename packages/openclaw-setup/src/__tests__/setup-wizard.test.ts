@@ -179,13 +179,15 @@ describe("setup-wizard", () => {
       }) as Record<string, unknown>;
 
       const models = config.models as {
-        providers: Record<string, { baseUrl: string; apiKey: string; models: Array<{ id: string }> }>;
+        providers: Record<string, { baseUrl: string; apiKey: string; api?: string; models: Array<{ id: string }> }>;
       };
       assert.ok(models.providers.gemini);
       assert.ok(models.providers.google);
       assert.equal(models.providers.gemini.baseUrl, "https://vault.example.com/v1/vault/llm/gemini");
       assert.equal(models.providers.google.baseUrl, "https://vault.example.com/v1/vault/llm/gemini");
       assert.equal(models.providers.google.apiKey, "vault-managed");
+      assert.equal(models.providers.gemini.api, "google-generative-ai");
+      assert.equal(models.providers.google.api, "google-generative-ai");
       assert.deepEqual(
         models.providers.google.models.map((entry) => entry.id),
         ["gemini-3.1-flash-lite-preview"],

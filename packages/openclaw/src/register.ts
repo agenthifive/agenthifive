@@ -51,7 +51,7 @@ import type {
 
 const DEFAULT_BASE_URL = "https://app.agenthifive.com";
 const PLUGIN_ID = "agenthifive";
-const PLUGIN_VERSION = "0.4.6";
+const PLUGIN_VERSION = "0.4.7";
 
 function normalizeDebugLevel(raw: unknown): VaultDebugLevel | undefined {
   if (typeof raw !== "string") return undefined;
@@ -857,6 +857,8 @@ async function initAgentAuth(
   pluginConfig: Record<string, unknown>,
   logger: PluginLogger,
 ): Promise<void> {
+  setProxiedProviders((pluginConfig.proxiedProviders ?? []) as string[]);
+
   if (config.auth.mode !== "agent") {
     // Bearer mode — set up directly without token manager
     _managedAuth = { mode: "bearer", token: config.auth.token };
@@ -977,12 +979,25 @@ function initRuntimeProvider(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function registerAgentHiFivePlugin(api: any): void {
+  const rawPluginConfig = api.pluginConfig as Record<string, unknown> | undefined;
+  const nestedPluginConfig = rawPluginConfig?.config as Record<string, unknown> | undefined;
   const pluginConfig =
-    ((api.pluginConfig as Record<string, unknown> | undefined)?.auth
-      ? (api.pluginConfig as Record<string, unknown>)
+    (rawPluginConfig?.auth
+      ? rawPluginConfig
+      : nestedPluginConfig?.auth
+        ? nestedPluginConfig
       : derivePluginConfigFromChannelAccount(api.config as Record<string, unknown> | undefined)
-        ?? (api.pluginConfig ?? {})) as Record<string, unknown>;
+        ?? (rawPluginConfig ?? {})) as Record<string, unknown>;
   const logger = api.logger ?? console;
+  if (process["env"]?.AH5_DEBUG_PLUGIN_CONFIG === "1") {
+    logger.error?.(
+      `AgentHiFive debug config: rawKeys=${Object.keys(rawPluginConfig ?? {}).join(",")}; ` +
+        `nestedKeys=${Object.keys(nestedPluginConfig ?? {}).join(",")}; ` +
+        `effectiveKeys=${Object.keys(pluginConfig ?? {}).join(",")}; ` +
+        `proxiedProviders=${JSON.stringify(pluginConfig.proxiedProviders ?? [])}; ` +
+        `hasAuth=${Boolean(pluginConfig.auth)}`,
+    );
+  }
 
   // ── Check if auth is configured ──────────────────────────────────────
   const authRaw = pluginConfig.auth as Record<string, unknown> | undefined;
@@ -1032,6 +1047,15 @@ export function registerAgentHiFivePlugin(api: any): void {
   }).finally(() => {
     _authReadyResolve?.();
   });
+
+  api.on(
+    "before_agent_start",
+    async () => {
+      await authReady;
+      return undefined;
+    },
+    { priority: 100 },
+  );
 
   // ── Verify patches (non-blocking) ──────────────────────────────────────
   verifyPatches(logger).catch(() => {

@@ -69,6 +69,10 @@ type GatewayResource = {
 const accountResources = new Map<string, GatewayResource>();
 let runtimeRef: PluginRuntime | null = null;
 
+function asPluginRuntimeChannel(channelRuntime: unknown): PluginRuntime["channel"] {
+  return channelRuntime as unknown as PluginRuntime["channel"];
+}
+
 function wakeChannelSession(sessionKey: string | undefined, message: string): void {
   if (!sessionKey || !runtimeRef?.system?.enqueueSystemEvent) {
     return;
@@ -556,7 +560,7 @@ export function buildAgentHiFiveChannelPlugin(sdk: Pick<OpenClawSdkCoreModule, "
         if (ctx.account.telegramEnabled && ctx.channelRuntime) {
           void startTelegramInboundGateway({
             cfg: ctx.cfg,
-            runtime: ctx.channelRuntime,
+            runtime: asPluginRuntimeChannel(ctx.channelRuntime),
             proxy: approvalProxy.proxy,
             accountId: ctx.account.accountId,
             ...(pluginLogger ? { logger: pluginLogger } : {}),
@@ -572,7 +576,7 @@ export function buildAgentHiFiveChannelPlugin(sdk: Pick<OpenClawSdkCoreModule, "
         if (ctx.account.slackEnabled && ctx.channelRuntime) {
           void startSlackInboundGateway({
             cfg: ctx.cfg,
-            runtime: ctx.channelRuntime,
+            runtime: asPluginRuntimeChannel(ctx.channelRuntime),
             proxy: approvalProxy.proxy,
             accountId: ctx.account.accountId,
             ...(pluginLogger ? { logger: pluginLogger } : {}),

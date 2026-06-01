@@ -7,7 +7,7 @@ description: Full reference for the @agenthifive/openclaw-setup CLI — interact
 
 # Setup CLI Reference
 
-The `@agenthifive/openclaw-setup` package (v0.2.18) is a standalone CLI that connects an [OpenClaw](https://openclaw.dev) installation to the AgentHiFive vault. It handles agent registration, ES256 key pair generation, LLM proxy configuration, plugin installation, runtime patching, channel setup, and diagnostics.
+The `@agenthifive/openclaw-setup` package (v0.2.19) is a standalone CLI that connects an [OpenClaw](https://openclaw.dev) installation to the AgentHiFive vault. It handles agent registration, ES256 key pair generation, LLM proxy configuration, plugin installation, runtime patching, channel setup, and diagnostics.
 
 Today, the runtime patching step is the supported compatibility path for
 vault-managed LLM proxying in OpenClaw. It is intended to be temporary until the
@@ -20,13 +20,13 @@ The binary name is **`ah5-setup`**.
 Run directly with npx (no install required):
 
 ```bash
-npx @agenthifive/openclaw-setup
+npx @agenthifive/openclaw-setup@0.2.19
 ```
 
 Or install globally for the `ah5-setup` command:
 
 ```bash
-npm install -g @agenthifive/openclaw-setup
+npm install -g @agenthifive/openclaw-setup@0.2.19
 ah5-setup
 ```
 
@@ -147,7 +147,7 @@ Skipped if `--skip-onboard` is passed or OpenClaw is already onboarded.
 
 ### Step 3 -- Install plugin
 
-Runs `openclaw plugins install @agenthifive/agenthifive` if the plugin is not already present in `~/.openclaw/extensions/`. Restarts the gateway afterwards. Skipped if `--skip-plugin-install` is passed.
+Runs `openclaw plugins install @agenthifive/agenthifive@0.4.7` if the plugin is not already present in OpenClaw's plugin install directory. Recent OpenClaw versions install npm plugins under `~/.openclaw/npm/node_modules/`; older versions may use `~/.openclaw/extensions/`. Restarts the gateway afterwards. Skipped if `--skip-plugin-install` is passed.
 
 ### Step 4 -- Bootstrap agent
 
@@ -203,7 +203,7 @@ Both patches:
 |----------|-------------|
 | OpenClaw `dist/*.js` chunks | Patched with vault credential resolution and broadcast bridge code. Backups saved as `*.js.bak`. |
 | `~/.openclaw/openclaw.json` | `models.providers` (LLM proxy baseUrls), `channels.agenthifive` (vault auth + channel providers), `plugins.entries.agenthifive` (plugin config), `agents.defaults` (default model), `tools.alsoAllow`. |
-| `~/.openclaw/extensions/` | AgentHiFive plugin installed via `openclaw plugins install`. |
+| `~/.openclaw/npm/node_modules/` or `~/.openclaw/extensions/` | AgentHiFive plugin installed via `openclaw plugins install`, depending on OpenClaw version. |
 | Local API key entries | For vault-managed providers, `apiKey` is replaced with `"vault-managed"` (original keys removed). |
 
 ## Config File Discovery
@@ -252,7 +252,7 @@ The `--verify` flag runs a comprehensive diagnostic without making changes. It c
 - Confirms the approval watcher can push events to the TUI.
 
 ### 5. Plugin
-- Checks `~/.openclaw/extensions/` for the `agenthifive` or `@agenthifive` plugin directory.
+- Checks OpenClaw's npm plugin install directory (`~/.openclaw/npm/node_modules/@agenthifive/agenthifive`) and the legacy `~/.openclaw/extensions/` location.
 - Reports plugin version.
 
 ### 6. Configuration
@@ -283,7 +283,7 @@ Note: The remove command does not restore patched dist chunks. If you need to re
 ### First-time setup (interactive)
 
 ```bash
-npx @agenthifive/openclaw-setup
+npx @agenthifive/openclaw-setup@0.2.19
 # Select "First connection to vault"
 # Enter base URL and bootstrap secret when prompted
 ```
@@ -291,7 +291,7 @@ npx @agenthifive/openclaw-setup
 ### First-time setup (non-interactive / CI)
 
 ```bash
-npx @agenthifive/openclaw-setup \
+npx @agenthifive/openclaw-setup@0.2.19 \
   --non-interactive \
   --base-url https://app.agenthifive.com \
   --bootstrap-secret ah5b_...

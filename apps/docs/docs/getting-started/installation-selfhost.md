@@ -368,8 +368,8 @@ curl http://localhost:8080/v1/health
 Once your self-hosted instance is running, install the AgentHiFive plugin for OpenClaw:
 
 ```bash
-openclaw plugins install @agenthifive/openclaw
-npx @agenthifive/openclaw-setup
+openclaw plugins install @agenthifive/agenthifive@0.4.7
+npx @agenthifive/openclaw-setup@0.2.19
 ```
 
 When prompted for the **base URL**, enter your self-hosted URL (e.g., `https://ah5.yourcompany.com` or `http://localhost:8080` for local testing).

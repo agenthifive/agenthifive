@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { apiFetch } from "@/lib/api-client";
+import { docsUrl } from "@/lib/docs-url";
 import { HelpTooltip } from "@/components/help-tooltip";
 
 interface OAuthApp {
@@ -169,7 +170,7 @@ export default function AppsPage() {
         <h2 className="text-lg font-semibold text-foreground">Custom OAuth Apps</h2>
         <p className="mt-1 text-sm text-muted">
           Use your own OAuth app credentials to connect Google or Microsoft services.{" "}
-          <a href="/docs/connections/custom-oauth-apps" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">
+          <a href={docsUrl("/connections/custom-oauth-apps")} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">
             Learn more
           </a>
         </p>

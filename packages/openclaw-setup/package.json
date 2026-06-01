@@ -1,6 +1,6 @@
 {
   "name": "@agenthifive/openclaw-setup",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "type": "module",
   "bin": {
     "ah5-setup": "dist/cli.js"
@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supersantux/AgentH5.git",
+    "url": "https://github.com/agenthifive/agenthifive.git",
     "directory": "packages/openclaw-setup"
   },
   "keywords": [

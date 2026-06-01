@@ -1,6 +1,6 @@
 {
   "name": "@agenthifive/agenthifive",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -51,10 +51,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supersantux/AgentH5.git",
+    "url": "https://github.com/agenthifive/agenthifive.git",
     "directory": "packages/openclaw"
   },
-  "homepage": "https://github.com/supersantux/AgentH5/tree/main/packages/openclaw#readme",
+  "homepage": "https://github.com/agenthifive/agenthifive/tree/main/packages/openclaw#readme",
   "keywords": [
     "openclaw",
     "agenthifive",
@@ -73,11 +73,11 @@
     "jose": "^5.9.3"
   },
   "peerDependencies": {
-    "openclaw": "^2026.3.22"
+    "openclaw": "^2026.5.6"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "openclaw": "^2026.3.22",
+    "openclaw": "^2026.5.6",
     "typescript": "^5.6.0"
   }
 }

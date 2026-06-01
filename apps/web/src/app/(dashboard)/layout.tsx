@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apiFetch } from "@/lib/api-client";
+import { docsUrl } from "@/lib/docs-url";
 import { REQUESTS_CHANGED_EVENT } from "@/lib/events";
 
 export default function DashboardLayout({
@@ -187,7 +188,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-3">
           {/* Documentation link */}
           <a
-            href={process.env.NEXT_PUBLIC_DOCS_URL || "/docs"}
+            href={docsUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted hover:text-foreground transition-colors"
@@ -266,7 +267,7 @@ export default function DashboardLayout({
                   Apps
                 </Link>
                 <a
-                  href={process.env.NEXT_PUBLIC_DOCS_URL || "/docs"}
+                  href={docsUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-gray-50"

@@ -30,8 +30,7 @@ jobs:
 
       - name: Run openclaw tests
         run: |
-          cd packages/openclaw
-          node --test --test-force-exit src/__tests__/*.test.ts
+          pnpm --filter @agenthifive/agenthifive test
 
       - name: Publish to npm
         run: |
