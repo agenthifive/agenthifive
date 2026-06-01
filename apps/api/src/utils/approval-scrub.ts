@@ -23,7 +23,7 @@ export function startApprovalScrub(logger?: { info: (obj: unknown, msg?: string)
 
   scrubInterval = setInterval(async () => {
     try {
-      const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS);
+      const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
 
       // Scrub requestDetails on resolved approvals that are older than the threshold
       // and still have extra keys beyond method+url (jsonb_object_keys count > 2).
