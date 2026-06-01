@@ -7,11 +7,15 @@ description: Full reference for the @agenthifive/openclaw-setup CLI — interact
 
 # Setup CLI Reference
 
-The `@agenthifive/openclaw-setup` package (v0.2.19) is a standalone CLI that connects an [OpenClaw](https://openclaw.dev) installation to the AgentHiFive vault. It handles agent registration, ES256 key pair generation, LLM proxy configuration, plugin installation, runtime patching, channel setup, and diagnostics.
+The `@agenthifive/openclaw-setup` package (v0.2.19) is a standalone CLI that connects an [OpenClaw](https://openclaw.ai) installation to the AgentHiFive vault. It handles agent registration, ES256 key pair generation, LLM proxy configuration, plugin installation, runtime patching, channel setup, and diagnostics.
 
 Today, the runtime patching step is the supported compatibility path for
 vault-managed LLM proxying in OpenClaw. It is intended to be temporary until the
 upstream OpenClaw contribution for native support is processed.
+
+:::info Tested OpenClaw version
+The current setup CLI and plugin release are tested with OpenClaw `2026.5.28`. Run `openclaw --version` before setup and upgrade OpenClaw if you are on an older `2026.3.x` or early `2026.5.x` build.
+:::
 
 The binary name is **`ah5-setup`**.
 
@@ -132,7 +136,7 @@ When running first-time setup (`setup` mode), the CLI performs these steps in or
 
 ### Step 1 -- Check OpenClaw installation
 
-Runs `openclaw --version` to confirm OpenClaw is installed and on the PATH. Exits with an error if not found.
+Runs `openclaw --version` to confirm OpenClaw is installed and on the PATH. The current release is tested with OpenClaw `2026.5.28`. Exits with an error if OpenClaw is not found.
 
 ### Step 2 -- OpenClaw onboard
 

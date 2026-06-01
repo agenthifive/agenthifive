@@ -163,6 +163,8 @@ When the vault returns HTTP 202 with `approvalRequired: true`, the proxy returns
 
 ## Installation
 
+AgentHiFive plugin `0.4.7` is tested with OpenClaw `2026.5.28`.
+
 ```bash
 openclaw plugins install @agenthifive/agenthifive@0.4.7
 ```

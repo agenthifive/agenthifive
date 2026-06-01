@@ -11,8 +11,12 @@ Connect your OpenClaw agent to the hosted AgentHiFive platform. No Docker, no da
 
 ## Prerequisites
 
-- [OpenClaw](https://openclaw.com) installed and running
+- [OpenClaw](https://openclaw.ai) installed and running
 - A web browser for the AgentHiFive dashboard
+
+:::info Tested OpenClaw version
+AgentHiFive plugin `0.4.7` is tested with OpenClaw `2026.5.28` and supports the `2026.5.x` plugin/runtime layout. Check your local version with `openclaw --version`.
+:::
 
 ## Step 1: Create Your Account
 
@@ -94,7 +98,7 @@ openclaw plugins install @agenthifive/agenthifive@0.4.7
 ```
 
 :::tip Version pinning
-We recommend pinning the version to avoid unexpected changes. Check the [latest release](https://www.npmjs.com/package/@agenthifive/agenthifive) for the current version.
+We recommend pinning both the AgentHiFive plugin and OpenClaw versions to avoid unexpected changes. This guide was verified with `@agenthifive/agenthifive@0.4.7`, `@agenthifive/openclaw-setup@0.2.19`, and OpenClaw `2026.5.28`. Check the [latest AgentHiFive plugin release](https://www.npmjs.com/package/@agenthifive/agenthifive) before upgrading.
 :::
 
 ## Step 4: Run the Setup
